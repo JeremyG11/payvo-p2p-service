@@ -1,0 +1,79 @@
+model FiatCryptoRate {
+  id              String    @id @default(uuid())
+  source          String     
+  fiatCurrency    String     
+  cryptoCurrency  CryptoCurrency    @default(USDT) 
+  rateType        RateType    
+  paymentMethod   String?  
+  rawRate         Decimal
+  adjustedRate    Decimal?   
+  marginPercentage Decimal?
+  volumeAvailable Decimal?
+  minLimit        Decimal?
+  maxLimit        Decimal?
+  adId            String?    
+  isActive        Boolean   @default(true)
+  fetchedAt       DateTime  @default(now())  
+  expiresAt       DateTime?  
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  @@index([source])
+  @@index([fiatCurrency])
+  @@index([cryptoCurrency])
+  @@index([rateType])
+  @@index([paymentMethod])
+
+  @@index([fiatCurrency, cryptoCurrency, paymentMethod, rateType])
+  @@index([source, fetchedAt])
+}
+
+enum PaymentMethodType {
+  MOBILE_MONEY
+  BANK_ACCOUNT
+}
+
+model MPesaKenya {
+  id                String            @id @default(uuid())
+  userId            String
+  phoneNumber       String
+  currency          FiatCurrency      @default(KES)
+
+  isDefault         Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  mpesaAccount      UserPaymentMethod? @relation("MpesaUserPaymentMethod")
+
+  @@index([userId])
+}
+
+model CBE {
+  id                String            @id @default(uuid())
+  userId            String
+  accountNumber     String
+  currency          FiatCurrency      @default(ETB)
+
+  isDefault         Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  cbeAccount        UserPaymentMethod? @relation("CbeUserPaymentMethod_account")
+
+  @@index([userId])
+}
+
+model UserPaymentMethod {
+  id                String            @id @default(uuid())
+  userId            String
+  paymentMethodType PaymentMethodType
+  paymentMethodId   String  @unique
+  isDefault         Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  mpesaAccount      MPesaKenya?       @relation("MpesaUserPaymentMethod", fields: [paymentMethodId], references: [id], map: "UserPaymentMethod_paymentMethodId_mpesa_fkey")
+  cbeAccount        CBE?              @relation("CbeUserPaymentMethod_account", fields: [paymentMethodId], references: [id], map: "UserPaymentMethod_paymentMethodId_cbe_fkey")
+ 
+  @@index([userId])
+}

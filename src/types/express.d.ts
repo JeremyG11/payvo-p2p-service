@@ -1,0 +1,14 @@
+import { Request } from "express";
+import { User } from "@prisma/client";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User;
+      cookies: Record<string, string>;
+    }
+    interface Response {
+      user?: User;
+    }
+  }
+}

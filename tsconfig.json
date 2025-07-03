@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "outDir": "dist",
+    "sourceMap": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "typeRoots": ["node_modules/@types", "src/types"]
+  },
+  "ts-node": {
+    "files": true
+  },
+  "include": [
+    "./src/**/*",
+    "./prisma.config.ts",
+    "./src/types/**/*.d.ts",
+    "src/**/*.d.ts"
+  ]
+}

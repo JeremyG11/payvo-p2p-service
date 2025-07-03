@@ -1,0 +1,40 @@
+enum Source {
+  BINANCE
+  OKX
+}
+
+enum FiatCurrency {
+  USD
+  KES
+  ETB
+  UGX
+  SSP
+}
+enum CryptoCurrency {
+  USDT
+}
+
+enum RateType {
+  BUY
+  SELL
+}
+
+enum UnitedStatesPaymentMethod {
+  BANK
+  CASH
+}
+enum KenyaPaymentMethod {
+  MPesaKenya
+  BANK
+}
+
+enum EthiopiaPaymentMethod {
+  CBE
+  TeleBirr
+}
+
+enum UgandaPaymentMethod {
+  BANK
+  MoMoNew
+}
+
