@@ -3,10 +3,10 @@ import cors from "cors";
 import dotenv from "dotenv";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-import express, { Application } from "express";
+import express, { Application, Request, Response } from "express";
 
 import cron from "@/cron";
-import router from "@/routes";
+import routes from "@/routes";
 import { config } from "@/config/env";
 
 const app: Application = express();
@@ -18,7 +18,7 @@ app.use(
     origin: "http://localhost:3000",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-api-signature"],
+    allowedHeaders: ["Content-Type", "p2porization", "x-api-signature"],
   })
 );
 
@@ -50,16 +50,18 @@ app.use(express.urlencoded({ extended: true }));
 /**
  * entry route
  */
-app.get("/", (req, res) => {
-  res.json({
-    service: config.serviceName,
-    version: "1.0.0",
-    environment: config.env,
-    message: "Welcome to the Payvo P2P Service",
+
+// health check endpoint
+app.get("/api/v1/p2p/health", (req: Request, res: Response) => {
+  res.status(200).json({
+    status: "UP",
+    timestamp: new Date().toISOString(),
+    message: `${config.serviceName} is running smoothly`,
   });
 });
 
-app.use("/", router);
+app.use("/api/v1/p2p", routes);
 
 cron;
+
 export default app;

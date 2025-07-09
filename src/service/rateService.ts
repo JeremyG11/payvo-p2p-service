@@ -9,7 +9,7 @@ import {
   UnitedStatesPaymentMethod,
 } from "@prisma/client";
 
-import { db } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { TPaymentMethod } from "@/types";
 import { getBinanceRates } from "../utils/rateFetcher";
 import { Decimal } from "@prisma/client/runtime/library";
@@ -32,7 +32,7 @@ async function storeBinanceRates(
       ? ad.rawRate.mul(new Decimal(1).add(DEFAULT_MARGIN_PERCENTAGE.div(100)))
       : undefined;
 
-    await db.fiatCryptoRate.create({
+    await prisma.fiatCryptoRate.create({
       data: {
         source: Source.BINANCE,
         fiatCurrency: fiatCurrency,

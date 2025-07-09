@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { db } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { fetchAndStoreAllBinanceRates } from "./service/rateService";
 
 cron.schedule("*/2 * * * *", async () => {
@@ -17,7 +17,7 @@ cron.schedule("*/2 * * * *", async () => {
  */
 async function cleanupExpiredRates() {
   try {
-    const deletedCount = await db.fiatCryptoRate.deleteMany({
+    const deletedCount = await prisma.fiatCryptoRate.deleteMany({
       where: {
         expiresAt: {
           lte: new Date(),
