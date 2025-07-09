@@ -46,7 +46,7 @@ export class PaymentController {
     createAccount: (userId: string, data: any) => Promise<T>
   ): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.userId;
       const { isDefault = false, ...accountData } = req.body;
 
       if (!userId) {
@@ -96,7 +96,7 @@ export class PaymentController {
     findMany: (userId: string) => Promise<T[]>
   ): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.userId;
       if (!userId) {
         res.status(401).json({ message: "Unauthorized" });
         return;
@@ -133,10 +133,23 @@ export class PaymentController {
     );
   }
 
-  async getMPesaAccounts(req: Request, res: Response): Promise<void> {
-    await this.getPaymentAccounts(req, res, async (userId: string) => {
-      return this.prisma.mPesaKenya.findMany({ where: { userId } });
-    });
+  async getMPesaAccounts(req: Request, res: Response) {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const accounts = await this.prisma.mPesaKenya.findMany({
+        where: { userId },
+      });
+      return res.status(200).json(accounts);
+    } catch (error) {
+      return res.status(500).json({
+        message:
+          error instanceof Error ? error.message : "Internal Server Error",
+      });
+    }
   }
 
   async addCBE(req: Request, res: Response): Promise<void> {
@@ -172,7 +185,7 @@ export class PaymentController {
     res: Response
   ): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.userId;
       const { fiatCurrency } = req.params;
 
       if (!userId) {
@@ -234,7 +247,7 @@ export class PaymentController {
 
   async updatePaymentMethod(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.userId;
       const { paymentMethodId } = req.params;
       // Destructure isDefault separately as its handling is special
       const { isDefault, ...updateData } = req.body;
@@ -308,7 +321,7 @@ export class PaymentController {
 
   async deletePaymentMethod(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.userId;
       const { paymentMethodId } = req.params;
 
       if (!userId) {
@@ -358,7 +371,6 @@ export class PaymentController {
 
   routes(): Router {
     const router = Router();
-
     router.get("/:fiatCurrency", this.getPaymentMethodsByCurrency.bind(this));
 
     // M-Pesa Kenya Routes

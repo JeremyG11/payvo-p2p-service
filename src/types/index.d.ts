@@ -17,3 +17,14 @@ export interface BasePaymentAccount {
   isDefault: boolean;
   currency?: FiatCurrency;
 }
+
+export interface CachedAuthData {
+  enumRole: string;
+  permissions: string[];
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: Role;
+  };
+}

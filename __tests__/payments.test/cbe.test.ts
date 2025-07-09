@@ -24,9 +24,10 @@ function buildApp(withUser = true) {
   app.use(express.json());
   if (withUser) {
     app.use((req, res, next) => {
-      req.user = { id: "user123" };
+      req.userId = "test-user-id"; 
       next();
     });
+    
   }
   // register necessary routes
   const router = express.Router();

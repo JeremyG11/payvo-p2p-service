@@ -7,6 +7,9 @@ export const config = {
   port: process.env.PORT || 5000,
   serviceName: process.env.SERVICE_NAME,
 
+  // crypto
+  jwtPublicKey: process.env.JWT_PUBLIC_KEY,
+
   // kafka
   kafka: {
     brokers: process.env.KAFKA_BROKERS
@@ -16,6 +19,9 @@ export const config = {
     clientId: process.env.KAFKA_CLIENT_ID || "payvo-p2p-service",
     groupId: process.env.KAFKA_GROUP_ID || "p2p-service-group",
   },
+
+  // redis
+  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
 
   // jwt
   jwtSecret: process.env.JWT_SECRET!,

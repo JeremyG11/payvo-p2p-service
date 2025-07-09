@@ -3,7 +3,7 @@ dotenv.config();
 
 import "module-alias/register";
 import app from "@/app";
-import kafkaInit from "@/kafka";
+import kafkaInit from "@/config/kafka";
 import { config } from "@/config/env";
 
 const PORT = config.port;
