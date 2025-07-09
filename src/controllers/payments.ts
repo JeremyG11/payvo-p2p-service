@@ -371,15 +371,14 @@ export class PaymentController {
 
   routes(): Router {
     const router = Router();
-    router.get("/:fiatCurrency", this.getPaymentMethodsByCurrency.bind(this));
 
-    // M-Pesa Kenya Routes
     router.get("/mpesa-kenya", this.getMPesaAccounts.bind(this));
     router.post("/mpesa-kenya", this.addMPesa.bind(this));
 
-    // CBE Routes
     router.get("/cbe", this.getCBEAccounts.bind(this));
     router.post("/cbe", this.addCBE.bind(this));
+
+    router.get("/:fiatCurrency", this.getPaymentMethodsByCurrency.bind(this));
 
     return router;
   }
