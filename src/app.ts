@@ -5,20 +5,21 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import express, { Application, Request, Response } from "express";
 
-import cron from "@/cron";
 import routes from "@/routes";
-import { config } from "@/config/env";
+import { errorHandler } from "@/middlewares/error.middleware";
 
 const app: Application = express();
 dotenv.config();
 
 // Middleware
+app.set("trust proxy", true);
+
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: "http://payvo.com",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "p2porization", "x-api-signature"],
+    allowedHeaders: ["Content-Type", "kycorization", "x-api-signature"],
   })
 );
 
@@ -50,18 +51,17 @@ app.use(express.urlencoded({ extended: true }));
 /**
  * entry route
  */
-
 // health check endpoint
-app.get("/api/v1/p2p/health", (req: Request, res: Response) => {
+app.get("/api/v1/kyc/health", (req: Request, res: Response) => {
   res.status(200).json({
     status: "UP",
     timestamp: new Date().toISOString(),
-    message: `${config.serviceName} is running smoothly`,
+    message: "Payvo-kyc-service is running smoothly",
   });
 });
 
-app.use("/api/v1/p2p", routes);
+app.use("/api/v1/kyc", routes);
 
-cron;
+app.use(errorHandler);
 
 export default app;

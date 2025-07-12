@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import express, { Router } from "express";
-import { authenticate } from "@/middleware/auth";
+import { authenticate } from "@/middlewares/auth";
 import { PaymentController } from "@/controllers/payments";
 import { RateController } from "@/controllers/rateController";
 

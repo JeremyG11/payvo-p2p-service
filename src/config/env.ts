@@ -4,7 +4,7 @@ dotenv.config();
 export const config = {
   // basic
   env: process.env.NODE_ENV || "development",
-  port: process.env.PORT || 5000,
+  port: process.env.PORT || 5006,
   serviceName: process.env.SERVICE_NAME,
 
   // crypto
