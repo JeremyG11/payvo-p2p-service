@@ -19,7 +19,7 @@ app.use(
     origin: "http://payvo.com",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "kycorization", "x-api-signature"],
+    allowedHeaders: ["Content-Type", "p2porization", "x-api-signature"],
   })
 );
 
@@ -52,15 +52,15 @@ app.use(express.urlencoded({ extended: true }));
  * entry route
  */
 // health check endpoint
-app.get("/api/v1/kyc/health", (req: Request, res: Response) => {
+app.get("/api/v1/p2p/health", (req: Request, res: Response) => {
   res.status(200).json({
     status: "UP",
     timestamp: new Date().toISOString(),
-    message: "Payvo-kyc-service is running smoothly",
+    message: "Payvo-p2p-service is running smoothly",
   });
 });
 
-app.use("/api/v1/kyc", routes);
+app.use("/api/v1/p2p", routes);
 
 app.use(errorHandler);
 
