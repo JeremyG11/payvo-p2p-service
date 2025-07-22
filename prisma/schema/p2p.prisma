@@ -1,23 +1,23 @@
 model FiatCryptoRate {
-  id              String    @id @default(uuid())
-  source          String     
-  fiatCurrency    String     
-  cryptoCurrency  CryptoCurrency    @default(USDT) 
-  rateType        RateType    
-  paymentMethod   String?  
-  rawRate         Decimal
-  adjustedRate    Decimal?   
-  marginPercentage Decimal?
-  volumeAvailable Decimal?
-  minLimit        Decimal?
-  maxLimit        Decimal?
-  adId            String?    
-  isActive        Boolean   @default(true)
-  fetchedAt       DateTime  @default(now())  
-  expiresAt       DateTime?  
+  id                  String    @id @default(uuid())
+  source              String     
+  fiatCurrency        String     
+  cryptoCurrency      CryptoCurrency    @default(USDT) 
+  rateType            RateType    
+  paymentMethod       String?  
+  rawRate             Decimal
+  adjustedRate        Decimal?   
+  marginPercentage    Decimal?
+  volumeAvailable     Decimal?
+  minLimit            Decimal?
+  maxLimit            Decimal?
+  adId                String?    
+  isActive            Boolean   @default(true)
+  fetchedAt           DateTime  @default(now())  
+  expiresAt           DateTime?  
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([source])
   @@index([fiatCurrency])
