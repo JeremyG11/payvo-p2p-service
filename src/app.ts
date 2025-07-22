@@ -6,7 +6,7 @@ import cookieParser from "cookie-parser";
 import express, { Application, Request, Response } from "express";
 
 import routes from "@/routes";
-import { errorHandler } from "@/middlewares/error.middleware";
+import { errorHandler } from "@/middlewares/error";
 
 const app: Application = express();
 dotenv.config();

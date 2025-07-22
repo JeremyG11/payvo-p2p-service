@@ -28,4 +28,9 @@ export const config = {
 
   // mail
   domain: process.env.FRONTEND_DOMAIN_URL!,
+
+  servicesURLs: {
+    auth: process.env.PAYVO_AUTH_SERVICE_URL || "http://localhost:5001/api/v1",
+    p2p: process.env.PAYVO_P2P_SERVICE_URL || "http://localhost:5006/api/v1",
+  },
 };

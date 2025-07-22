@@ -18,6 +18,10 @@ export interface BasePaymentAccount {
   currency?: FiatCurrency;
 }
 
+export interface MobileMoneyPaymentAccount extends BasePaymentAccount {
+  phoneNumber: string;
+}
+
 export interface CachedAuthData {
   enumRole: string;
   permissions: string[];

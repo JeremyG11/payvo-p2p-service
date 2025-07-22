@@ -1,10 +1,12 @@
-import axios from "axios";
 import "module-alias/register";
-import { verifyJwt } from "@/lib/jwt";
 import { logger } from "@/lib/logger";
+import { redis } from "@/config/radis";
 import { CachedAuthData } from "@/types";
+import { verifyJwt } from "@/lib/jwt";
 import { Request, Response, NextFunction } from "express";
 import { getUserPermissions } from "@/lib/redis/get-user-permissions";
+import { isUserBlacklisted, isTokenBlacklisted } from "@/lib/authBlacklist";
+import { fetchUserPermissions } from "@/service/fetch-user-permissions";
 
 export const authenticate = async (
   req: Request,
@@ -13,9 +15,8 @@ export const authenticate = async (
 ) => {
   try {
     const accessToken =
-      (req.cookies && req.cookies.accessToken) ||
-      (req.headers.authorization &&
-        req.headers.authorization.replace(/^Bearer\s/, ""));
+      req.cookies?.accessToken ||
+      req.headers.authorization?.replace(/^Bearer\s/, "");
 
     if (!accessToken) {
       res.status(401).json({
@@ -27,7 +28,8 @@ export const authenticate = async (
 
     const { decoded, valid, expired } = verifyJwt(accessToken);
 
-    if (!valid || !decoded) {
+    if (!valid || !decoded || typeof decoded.userId !== "string") {
+      logger.error(`Invalid JWT payload: ${JSON.stringify(decoded)}`);
       res.status(401).json({
         code: "AuthenticationError",
         message: expired ? "Token expired" : "Invalid token",
@@ -35,13 +37,23 @@ export const authenticate = async (
       return;
     }
 
-    if (typeof decoded.userId !== "string") {
-      logger.error(
-        `JWT payload ID is not a string: ${JSON.stringify(decoded)}`
+    if (await isUserBlacklisted(decoded.userId)) {
+      logger.warn(`Access denied for blacklisted user: ${decoded.userId}`);
+      res.status(403).json({
+        code: "UserBlacklisted",
+        message: "User account is suspended.",
+      });
+      return;
+    }
+
+    // Check this specific login session been blacklisted (e.g., via 'log out from all devices')
+    if (decoded.jti && (await isTokenBlacklisted(accessToken))) {
+      logger.warn(
+        `Access denied for blacklisted session (jti): ${decoded.jti}`
       );
       res.status(401).json({
-        code: "AuthenticationError",
-        message: "Unauthenticated: Invalid token.",
+        code: "TokenRevoked",
+        message: "Token has been revoked.",
       });
       return;
     }
@@ -49,69 +61,51 @@ export const authenticate = async (
     req.userId = decoded.userId;
     res.locals.user = decoded;
 
-    let cachedAuthData: CachedAuthData | null = null;
+    let authData: CachedAuthData | null = null;
 
     try {
-      cachedAuthData = await getUserPermissions(req.userId);
-    } catch (redisError) {
-      logger.error(`Error accessing Redis for user ${req.userId}:`, redisError);
+      authData = await getUserPermissions(decoded.userId);
+    } catch (err) {
+      logger.error(`Redis error for ${decoded.userId}:`, err);
     }
 
-    if (!cachedAuthData) {
-      logger.info(
-        `User ${req.userId} auth data not in Redis, fetching from Auth Service.`
-      );
+    // On cache‐miss, fetch from Auth Service and cache it
+    if (!authData) {
       try {
-        const authServiceResponse = await axios.get<CachedAuthData>(
-          `https://api.e-flavours.com/api/v1/auth/users/${req.userId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
-
-        cachedAuthData = authServiceResponse.data;
-
-        // Extract and assign role and permissions after fetching from Auth Service
-        if (cachedAuthData && cachedAuthData.user && cachedAuthData.user.role) {
-          req.userEnumRole = cachedAuthData.user.role.name; // Assign the role (enumRole)
-          req.userPermissions = cachedAuthData.user.role.rolePermissions.map(
-            (permission: any) => permission.permission.name
-          ); // Map the permissions to an array of permission names
-        }
-      } catch (authServiceError) {
+        authData = await fetchUserPermissions(decoded.userId, accessToken);
+        // await redis().set(redisKey, JSON.stringify(authData), "EX", 60 * 60);
+      } catch (err) {
         logger.error(
-          `Failed to fetch user data from Auth Service for ${req.userId}:`,
-          authServiceError
+          `Failed to fetch/cache permissions for ${decoded.userId}:`,
+          err
         );
-        res.status(403).json({
-          code: "Forbidden",
-          message: "User does not have valid permissions.",
+        return res.status(503).json({
+          code: "ServiceUnavailable",
+          message: "Unable to retrieve permissions.",
         });
-        return;
       }
     }
 
-    if (!cachedAuthData || !req.userEnumRole || !req.userPermissions) {
-      logger.error(
-        `No authentication data found for user ${req.userId} after all attempts.`
-      );
-      res.status(403).json({
+    if (
+      !authData ||
+      !authData.enumRole ||
+      !Array.isArray(authData.permissions)
+    ) {
+      return res.status(403).json({
         code: "Forbidden",
-        message: "User does not have valid permissions.",
+        message: "User has no valid permissions.",
       });
-      return;
     }
+
+    req.userEnumRole = authData.enumRole;
+    req.userPermissions = authData.permissions;
 
     next();
   } catch (error) {
-    logger.error(
-      "Error in authentication middleware outside of specific JWT/auth issues:",
-      error
-    );
-    res
-      .status(500)
-      .json({ code: "ServerError", message: "Internal server error" });
+    logger.error("Unexpected error in authentication middleware:", error);
+    res.status(500).json({
+      code: "ServerError",
+      message: "Internal server error",
+    });
   }
 };

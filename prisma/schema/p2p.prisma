@@ -18,6 +18,7 @@ model FiatCryptoRate {
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
   @@index([source])
   @@index([fiatCurrency])
   @@index([cryptoCurrency])
@@ -67,13 +68,15 @@ model UserPaymentMethod {
   id                String            @id @default(uuid())
   userId            String
   paymentMethodType PaymentMethodType
-  paymentMethodId   String  @unique
+  paymentMethodId   String            @unique 
   isDefault         Boolean           @default(false)
+
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  mpesaAccount      MPesaKenya?       @relation("MpesaUserPaymentMethod", fields: [paymentMethodId], references: [id], map: "UserPaymentMethod_paymentMethodId_mpesa_fkey")
-  cbeAccount        CBE?              @relation("CbeUserPaymentMethod_account", fields: [paymentMethodId], references: [id], map: "UserPaymentMethod_paymentMethodId_cbe_fkey")
- 
+  cbeAccount        CBE?              @relation("CbeUserPaymentMethod_account", fields: [paymentMethodId], references: [id], map: "UserPaymentMethod_cbeAccount_fkey")
+  mpesaAccount      MPesaKenya?       @relation("MpesaUserPaymentMethod", fields: [paymentMethodId], references: [id], map: "UserPaymentMethod_mpesaAccount_fkey")
+
   @@index([userId])
+  @@index([paymentMethodType, paymentMethodId])
 }

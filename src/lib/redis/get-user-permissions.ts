@@ -2,7 +2,6 @@ import { logger } from "@/lib/logger";
 import { CachedAuthData } from "@/types";
 import { redis as RedisClient } from "@/config/radis";
 
- 
 /**
  *  Fetches user permissions from caches Redis.
  * @param userId
@@ -29,5 +28,5 @@ export async function getUserPermissions(
     logger.error(`Error accessing Redis for user ${userId}:`, redisError);
   }
 
-  return null;
+  return cachedAuthData;
 }

@@ -120,7 +120,7 @@ export class PaymentController {
         userId: string,
         data: { phoneNumber: string; isDefault: boolean }
       ) => {
-        // Assume KES for M-Pesa Kenya
+        // KES for M-Pesa Kenya
         return this.prisma.mPesaKenya.create({
           data: {
             userId,
