@@ -7,6 +7,7 @@ import express, { Application, Request, Response } from "express";
 
 import routes from "@/routes";
 import { errorHandler } from "@/middlewares/error";
+import cron from "./cron";
 
 const app: Application = express();
 dotenv.config();
@@ -63,5 +64,7 @@ app.get("/api/v1/p2p/health", (req: Request, res: Response) => {
 app.use("/api/v1/p2p", routes);
 
 app.use(errorHandler);
+
+cron;
 
 export default app;
