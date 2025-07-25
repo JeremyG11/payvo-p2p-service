@@ -73,6 +73,34 @@ export class RateController {
   }
 
   /**
+   * Fetches *all* rates for a given fiat currency, regardless of paymentMethod.
+   */
+  public getRatesByCurrency = async (req: Request, res: Response) => {
+    const { fiatCurrency } = req.params;
+    const currency = (fiatCurrency as string).toUpperCase() as FiatCurrency;
+
+    // validate enum
+    if (!Object.values(FiatCurrency).includes(currency)) {
+      return res
+        .status(400)
+        .json({ error: `Invalid currency: ${fiatCurrency}` });
+    }
+
+    try {
+      const rates = await this.prisma.fiatCryptoRate.findMany({
+        where: { fiatCurrency: currency },
+        orderBy: [{ fetchedAt: "desc" }],
+      });
+      return res.status(200).json(rates);
+    } catch (error) {
+      console.error("Error fetching all rates by currency:", error);
+      return res
+        .status(500)
+        .json({ error: `Failed to fetch rates for ${currency}.` });
+    }
+  };
+
+  /**
    * Fetches the best USDT/KES rates for the specified payment method.
    * @param req - The request object containing user information.
    * @param res - The response object used to send the result back to the client.
@@ -119,6 +147,8 @@ export class RateController {
 
   private routes(): void {
     this.router.get("/usdt-kes", this.getUSDTKESWithMpesaKenyaRates);
-    this.router.get("/usdt-etb/:telebirr", this.getUSDTETBWithTeleBirrRates);
+    this.router.get("/usdt-etb/", this.getUSDTETBWithTeleBirrRates);
+
+    this.router.get("/:fiatCurrency", this.getRatesByCurrency);
   }
 }
