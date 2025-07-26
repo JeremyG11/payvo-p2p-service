@@ -1,8 +1,7 @@
 import "module-alias/register";
 import { logger } from "@/lib/logger";
-import { redis } from "@/config/radis";
-import { CachedAuthData } from "@/types";
 import { verifyJwt } from "@/lib/jwt";
+import { CachedAuthData } from "@/types";
 import { Request, Response, NextFunction } from "express";
 import { getUserPermissions } from "@/lib/redis/get-user-permissions";
 import { isUserBlacklisted, isTokenBlacklisted } from "@/lib/authBlacklist";
