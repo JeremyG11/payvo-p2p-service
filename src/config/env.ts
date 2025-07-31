@@ -30,7 +30,7 @@ export const config = {
   domain: process.env.FRONTEND_DOMAIN_URL!,
 
   servicesURLs: {
-    auth: process.env.PAYVO_AUTH_SERVICE_URL || "http://localhost:5001/api/v1",
-    p2p: process.env.PAYVO_P2P_SERVICE_URL || "http://localhost:5006/api/v1",
+    auth: process.env.AUTH_SERVICE_URL!,
+    p2p: process.env.P2P_SERVICE_URL!,
   },
 };
