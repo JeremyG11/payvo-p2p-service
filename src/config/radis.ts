@@ -1,35 +1,41 @@
-import { config } from '@/config/env';
-import RedisClient from '@payvo/redis';
+import { config } from "@/config/env";
+import RedisClient from "@payvo/redis";
 
-let clientInstance: RedisClient | null = null;
+let client: RedisClient | null = null;
 
-export const initRedis = async (): Promise<
-  ReturnType<RedisClient['getInstance']>
-> => {
-  try {
-    clientInstance = await RedisClient.create({
-      url: config.redisUrl,
-      reconnect: {
-        maxAttempts: 5,
-        delay: 1000,
-        timeout: 5000,
-      },
-      healthCheck: {
-        interval: 10000,
-        enabled: true,
-      },
-    });
-
-    return clientInstance.getInstance();
-  } catch (error) {
-    console.error('Error initializing Redis:', error);
-    throw new Error('Redis initialization failed.');
+/**
+ * Initialize and return the singleton Redis client.
+ */
+export async function initRedis(): Promise<
+  ReturnType<RedisClient["getInstance"]>
+> {
+  if (client) {
+    return client.getInstance();
   }
-};
 
-export const redis = (): ReturnType<RedisClient['getInstance']> => {
-  if (!clientInstance) {
-    throw new Error('Redis client is not initialized. Call initRedis first.');
+  client = await RedisClient.create({
+    url: config.redisUrl,
+    reconnect: { maxAttempts: 5, delay: 1_000, timeout: 5_000 },
+    healthCheck: { enabled: true, interval: 10_000 },
+  });
+
+  return client.getInstance();
+}
+
+/**
+ * Return the already initialized Redis client.
+ * Throws if you forgot to call `initRedis()` at startup.
+ */
+export function getRedis(): ReturnType<RedisClient["getInstance"]> {
+  if (!client) {
+    throw new Error("Redis not initialized. Call initRedis() first.");
   }
-  return clientInstance.getInstance();
-};
+  return client.getInstance();
+}
+
+/** Optionally, to shut it down cleanly: */
+export async function shutdownRedis() {
+  if (!client) return;
+  await client.getInstance().quit();
+  client = null;
+}

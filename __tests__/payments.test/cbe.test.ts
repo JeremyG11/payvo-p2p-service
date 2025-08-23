@@ -1,146 +1,171 @@
 import request from "supertest";
-import express from "express";
 import { describe, it, beforeEach, expect, vi } from "vitest";
+import { PaymentMethodType, FiatCurrency } from "@prisma/client";
+import express, { Request, Application, Response, NextFunction } from "express";
 import { PaymentController } from "../../src/controllers/payments";
 
+// Extend the Express Request interface for our tests
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+    }
+  }
+}
+
+// Mock Prisma client with all necessary methods
 const mockPrisma = {
-  cBE: {
-    findMany: vi.fn(),
-    create: vi.fn(),
+  supportedPaymentMethod: {
+    findFirst: vi.fn(),
   },
   userPaymentMethod: {
     updateMany: vi.fn(),
     create: vi.fn(),
     findMany: vi.fn(),
-    findUnique: vi.fn(),
+    findFirst: vi.fn(),
     delete: vi.fn(),
+    update: vi.fn(),
   },
+  cbe: {
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
+  telebirr: {
+    findMany: vi.fn(),
+  },
+  mPesaKenya: {
+    findMany: vi.fn(),
+  },
+  $transaction: vi.fn(async (callback) => await callback(mockPrisma)),
 };
 
+// Instantiate controller with mock
 const paymentController = new PaymentController(mockPrisma as any);
 
-function buildApp(withUser = true) {
-  const app = express();
-  app.use(express.json());
-  if (withUser) {
-    app.use((req, res, next) => {
-      req.userId = "test-user-id"; 
-      next();
-    });
-    
-  }
-  // register necessary routes
-  const router = express.Router();
-  router.post("/cbe", paymentController.addCBE.bind(paymentController));
-  router.get("/cbe", paymentController.getCBEAccounts.bind(paymentController));
-  app.use("/payments", router);
-  return app;
-}
+// Setup Express App
+const app: Application = express();
+app.use(express.json());
+app.use((req: Request, res: Response, next: NextFunction) => {
+  req.userId = "test-user-id";
+  next();
+});
+app.use("/payments", paymentController.routes());
 
 describe("PaymentController API — CBE endpoints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("GET /payments/cbe", () => {
-    it("should return 200 and an array of CBE accounts", async () => {
-      mockPrisma.cBE.findMany.mockResolvedValue([
-        { id: "cbe1", userId: "user123", accountNumber: "12345678" },
-      ]);
+  //  GET /payments/methods/cbe
+  it("should return 200 and an array of CBE accounts", async () => {
+    mockPrisma.cbe.findMany.mockResolvedValue([
+      { id: "cbe1", accountNumber: "12345678" },
+    ]);
+    const res = await request(app).get("/payments/methods/cbe");
 
-      const app = buildApp();
-      const res = await request(app).get("/payments/cbe");
-
-      expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body[0].accountNumber).toBe("12345678");
-    });
-
-    it("should return 401 if user is missing", async () => {
-      const app = buildApp(false);
-      const res = await request(app).get("/payments/cbe");
-
-      expect(res.status).toBe(401);
-      expect(res.body).toEqual({ message: "Unauthorized" });
-    });
-
-    it("should return 500 on internal error", async () => {
-      mockPrisma.cBE.findMany.mockRejectedValue(new Error("DB fail"));
-      const app = buildApp();
-      const res = await request(app).get("/payments/cbe");
-
-      expect(res.status).toBe(500);
-      expect(res.body.message).toContain("DB fail");
-    });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data[0].accountNumber).toBe("12345678");
   });
 
-  describe("POST /payments/cbe", () => {
-    it("should create a new CBE account", async () => {
-      const newAccount = {
-        id: "cbe123",
-        userId: "user123",
+  //  POST /payments/methods/cbe
+  it("should create a new CBE account", async () => {
+    const mockSupportedMethod = {
+      id: "sup-cbe",
+      type: PaymentMethodType.BANK_ACCOUNT,
+      method: "Commercial Bank of Ethiopia",
+      currency: FiatCurrency.ETB,
+      isActive: true,
+      logo: "url/cbe.png",
+    };
+    mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue(
+      mockSupportedMethod
+    );
+    mockPrisma.cbe.findUnique.mockResolvedValue(null);
+    mockPrisma.userPaymentMethod.updateMany.mockResolvedValue({});
+    mockPrisma.userPaymentMethod.create.mockResolvedValue({
+      id: "upm-cbe-1",
+      userId: "test-user-id",
+      supportedPaymentMethodId: "sup-cbe",
+      isDefault: true,
+    });
+    const newAccount = {
+      id: "upm-cbe-1",
+      accountNumber: "87654321",
+      accountName: "John Doe",
+    };
+    mockPrisma.cbe.create.mockResolvedValue(newAccount);
+
+    const res = await request(app).post("/payments/methods/cbe").send({
+      accountNumber: "87654321",
+      accountName: "John Doe",
+      isDefault: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual(
+      expect.objectContaining({
         accountNumber: "87654321",
-        isDefault: true,
-        currency: "ETB",
-      };
-      mockPrisma.cBE.create.mockResolvedValue(newAccount);
-      mockPrisma.userPaymentMethod.updateMany.mockResolvedValue({});
-      mockPrisma.userPaymentMethod.create.mockResolvedValue({
-        id: "upm-cbe-1",
-        userId: "user123",
-        paymentMethodType: "BANK_ACCOUNT",
-        paymentMethodId: "cbe123",
-        isDefault: true,
+        accountName: "John Doe",
+      })
+    );
+    expect(res.body.message).toBe("cbe account added successfully");
+  });
+
+  //  POST /payments/methods/cbe - Error Cases
+  it("should return 400 if accountNumber is missing", async () => {
+    const res = await request(app)
+      .post("/payments/methods/cbe")
+      .send({ accountName: "John Doe" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBe("Invalid input data");
+  });
+  it("should return 400 for duplicate account number", async () => {
+    // Mock the supported payment method lookup
+    mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue({
+      id: "sup-cbe",
+      type: PaymentMethodType.BANK_ACCOUNT,
+      method: "Commercial Bank of Ethiopia",
+      currency: FiatCurrency.ETB,
+      isActive: true,
+      logo: "url/cbe.png",
+    });
+
+    mockPrisma.cbe.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "existing-id",
+        accountNumber: "12345678901",
+        accountName: "Jane Doe",
+        userId: "some-user-id",
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
 
-      const app = buildApp();
-      const res = await request(app)
-        .post("/payments/cbe")
-        .send({ accountNumber: "87654321", isDefault: true });
+    const res = await request(app)
+      .post("/payments/methods/cbe")
+      .send({ accountNumber: "12345678901", accountName: "Jane Doe" });
 
-      expect(res.status).toBe(201);
-      expect(res.body.account).toEqual(
-        expect.objectContaining({
-          id: "cbe123",
-          accountNumber: "87654321",
-        })
-      );
-      expect(res.body.message).toMatch(
-        /BANK_ACCOUNT account added successfully/i
-      );
-    });
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBe("This account number is already registered");
+  });
 
-    it("should return 400 if accountNumber is missing", async () => {
-      const app = buildApp();
-      const res = await request(app)
-        .post("/payments/cbe")
-        .send({ isDefault: false });
+  //  Common Error Cases
+  it("should return 401 if user is missing", async () => {
+    const unauthApp = express();
+    unauthApp.use(express.json());
+    unauthApp.use("/payments", paymentController.routes());
+    const res = await request(unauthApp).get("/payments/methods/cbe");
 
-      expect(res.status).toBe(400);
-      expect(res.body).toEqual({
-        message: "Required account details are missing.",
-      });
-    });
-
-    it("should return 401 if no user", async () => {
-      const app = buildApp(false);
-      const res = await request(app)
-        .post("/payments/cbe")
-        .send({ accountNumber: "1234" });
-
-      expect(res.status).toBe(401);
-      expect(res.body).toEqual({ message: "Unauthorized" });
-    });
-
-    it("should return 500 on DB error", async () => {
-      mockPrisma.cBE.create.mockRejectedValue(new Error("DB bad"));
-      const app = buildApp();
-      const res = await request(app)
-        .post("/payments/cbe")
-        .send({ accountNumber: "1234" });
-
-      expect(res.status).toBe(500);
-      expect(res.body.message).toContain("DB bad");
-    });
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBe("Authentication required");
   });
 });

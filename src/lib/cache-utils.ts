@@ -1,17 +1,31 @@
-import { redis } from "@/config/radis";
+import { logger } from "@/lib/logger";
+import { AppCacheFields } from "@/lib/cache-keys";
+import { redisCacheService } from "@/services/cache";
 
-export const getRolesAndPermissionsFromCache = async () => {
+/**
+ * Fetches the cached roles and permissions from Redis.
+ * If not found, throws an error indicating the data is missing.
+ * This function does not fall back to the database.
+ */
+
+export async function getAppRolesPermissionsFromRedis(): Promise<
+  { id: string; name: string; permissions: string[] }[]
+> {
   try {
-    const rolesPermissionsData = await redis().get("app:roles_permissions");
+    const cached = await redisCacheService.getAppData<any[]>(
+      AppCacheFields.RolesPermissions
+    );
 
-    if (rolesPermissionsData) {
-      const parsedData = JSON.parse(rolesPermissionsData.toString());
-      return parsedData;
+    if (cached) {
+      logger.debug("App roles/permissions hit in cache");
+      return cached;
     }
 
-    return null;
+    throw new Error(
+      "RBAC data not found in Redis. Auth service may not be running or data may not be loaded yet."
+    );
   } catch (error) {
-    console.error("Error fetching roles and permissions from Redis:", error);
-    return null;
+    logger.error("Failed to get RBAC data from Redis", error);
+    throw error;
   }
-};
+}

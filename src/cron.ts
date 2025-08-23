@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { prisma } from "@/lib/prisma";
-import { fetchAndStoreAllBinanceRates } from "./service/rateService";
+import { fetchAndStoreAllBinanceRates } from "./services/rateService";
 
 cron.schedule("*/2 * * * *", async () => {
   console.log(
@@ -9,7 +9,6 @@ cron.schedule("*/2 * * * *", async () => {
   );
   await fetchAndStoreAllBinanceRates();
 });
-
 
 /**
  * Cleanup job to remove expired rates from the database.

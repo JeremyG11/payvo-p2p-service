@@ -1,288 +1,613 @@
 import {
+  BadRequestError,
+  UnauthenticatedError,
+  UnauthorizedError,
+} from "@/lib/error";
+import { asyncWrapper } from "@/middlewares/error";
+
+import {
+  AddCbePaymentMethodSchema,
+  AddMPesaKenyaSchema,
+  AddTeleBirrSchema,
+} from "@/schema";
+import {
   Prisma,
   PrismaClient,
   FiatCurrency,
   PaymentMethodType,
+  MPesaKenya,
+  Cbe,
+  TeleBirr,
+  UserPaymentMethod,
+  SupportedPaymentMethod,
 } from "@prisma/client";
+
 import { Router, Request, Response } from "express";
 
 /**
- * Controller for managing user payment methods and accounts.
- *
- * Handles CRUD operations for different payment methods (e.g., MPESA, CBE Bank),
- * including adding, retrieving, updating, and deleting payment accounts.
- * Supports filtering by currency and setting default payment methods.
- *
- * Methods:
- * - addMPesa: Add a new MPESA mobile money account for the authenticated user.
- * - getMPesaAccounts: Retrieve all MPESA accounts for the authenticated user.
- * - addCBE: Add a new CBE Bank account for the authenticated user.
- * - getCBEAccounts: Retrieve all CBE Bank accounts for the authenticated user.
- * - getPaymentMethodsByCurrency: Get payment accounts filtered by fiat currency.
- * - updatePaymentMethod: Update details or default status of a payment method.
- * - deletePaymentMethod: Remove a payment method and its associated account.
- * - routes: Returns an Express router with all payment-related endpoints.
- *
- * All endpoints require authentication and expect a valid user ID.
- *
- * @remarks
- * This controller uses Prisma ORM for database operations and expects
- * Express Request and Response objects for handling HTTP requests.
- *
- * @example
- * const paymentController = new PaymentController(prismaClient);
- * app.use('/payments', paymentController.routes());
+ * Interface for a standardized API response.
+ * @template T The type of the data returned in the response.
+ */
+interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Custom Request type to ensure userId is present after authentication middleware.
+ */
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+}
+
+/**
+ * The unified type for all payment accounts (MPesa, CBE, TeleBirr).
+ */
+type PaymentAccount = MPesaKenya | Cbe | TeleBirr;
+
+/**
+ * The unified type for user payment method details, including the linked account.
+ */
+type UserPaymentMethodDetails = UserPaymentMethod & {
+  supportedPaymentMethod: SupportedPaymentMethod;
+  mpesaKenya: MPesaKenya | null;
+  cbe: Cbe | null;
+  telebirr: TeleBirr | null;
+};
+
+/**
+ * Abstract base class for handling different payment methods.
+ */
+abstract class PaymentMethodHandler {
+  constructor(protected prisma: PrismaClient) {}
+
+  abstract addAccount(req: Request, userId: string): Promise<PaymentAccount>;
+
+  abstract getAccounts(userId: string): Promise<PaymentAccount[]>;
+
+  abstract updateAccount(
+    accountId: string,
+    data: Partial<PaymentAccount>
+  ): Promise<PaymentAccount | null>;
+
+  protected async handleIsDefault(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    isDefault: boolean
+  ): Promise<void> {
+    if (isDefault) {
+      await tx.userPaymentMethod.updateMany({
+        where: { userId, isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+  }
+}
+
+/**
+ * Handler for MPesa Kenya payment method.
+ */
+class MPesaKenyaHandler extends PaymentMethodHandler {
+  async addAccount(req: Request, userId: string): Promise<MPesaKenya> {
+    const validatedData = AddMPesaKenyaSchema.safeParse(req.body);
+
+    if (!validatedData.success) {
+      throw new BadRequestError(
+        validatedData.error.issues.map((issue) => issue.message).join(", ")
+      );
+    }
+    const { phoneNumber } = validatedData.data;
+    const { isDefault = false } = req.body;
+
+    const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
+      where: {
+        type: PaymentMethodType.MOBILE_MONEY,
+        currency: FiatCurrency.KES,
+        isActive: true,
+      },
+    });
+
+    if (!supportedMethod) {
+      throw new BadRequestError("MPesa Kenya is not currently supported");
+    }
+
+    const existingAccount = await this.prisma.mPesaKenya.findUnique({
+      where: { phoneNumber },
+    });
+
+    if (existingAccount) {
+      throw new BadRequestError("This phone number is already registered");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await this.handleIsDefault(tx, userId, isDefault);
+
+      const userPaymentMethod = await tx.userPaymentMethod.create({
+        data: {
+          userId,
+          supportedPaymentMethodId: supportedMethod.id,
+          isDefault,
+        },
+      });
+
+      return tx.mPesaKenya.create({
+        data: {
+          id: userPaymentMethod.id,
+          phoneNumber,
+        },
+        include: {
+          userPaymentMethod: { include: { supportedPaymentMethod: true } },
+        },
+      });
+    });
+  }
+
+  async getAccounts(userId: string): Promise<MPesaKenya[]> {
+    return this.prisma.mPesaKenya.findMany({
+      where: { userPaymentMethod: { userId } },
+      include: {
+        userPaymentMethod: { include: { supportedPaymentMethod: true } },
+      },
+    });
+  }
+
+  async updateAccount(
+    accountId: string,
+    data: Partial<MPesaKenya>
+  ): Promise<MPesaKenya | null> {
+    const { phoneNumber } = data;
+    if (!phoneNumber) return null;
+
+    const existingAccount = await this.prisma.mPesaKenya.findUnique({
+      where: { phoneNumber },
+    });
+
+    if (existingAccount && existingAccount.id !== accountId) {
+      throw new BadRequestError("This phone number is already registered");
+    }
+
+    return this.prisma.mPesaKenya.update({
+      where: { id: accountId },
+      data: { phoneNumber },
+    });
+  }
+}
+
+/**
+ * Handler for CBE bank account payment method.
+ */
+class CBEHandler extends PaymentMethodHandler {
+  async addAccount(req: Request, userId: string): Promise<Cbe> {
+    const validatedData = AddCbePaymentMethodSchema.safeParse(req.body);
+
+    if (!validatedData.success) {
+      throw new BadRequestError(
+        validatedData.error.issues.map((issue) => issue.message).join(", ")
+      );
+    }
+    const { isDefault, accountNumber, accountName } = validatedData.data;
+
+    const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
+      where: {
+        type: PaymentMethodType.BANK_ACCOUNT,
+        currency: FiatCurrency.ETB,
+        isActive: true,
+      },
+    });
+
+    if (!supportedMethod) {
+      throw new BadRequestError("CBE is not currently supported");
+    }
+
+    const existingAccount = await this.prisma.cbe.findUnique({
+      where: { accountNumber },
+    });
+
+    if (existingAccount) {
+      throw new BadRequestError("This account number is already registered");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await this.handleIsDefault(tx, userId, isDefault);
+
+      const userPaymentMethod = await tx.userPaymentMethod.create({
+        data: {
+          userId,
+          supportedPaymentMethodId: supportedMethod.id,
+          isDefault,
+        },
+      });
+
+      return tx.cbe.create({
+        data: {
+          id: userPaymentMethod.id,
+          accountNumber,
+          accountName,
+        },
+        include: {
+          userPaymentMethod: { include: { supportedPaymentMethod: true } },
+        },
+      });
+    });
+  }
+
+  async getAccounts(userId: string): Promise<Cbe[]> {
+    return this.prisma.cbe.findMany({
+      where: { userPaymentMethod: { userId } },
+      include: {
+        userPaymentMethod: { include: { supportedPaymentMethod: true } },
+      },
+    });
+  }
+
+  async updateAccount(
+    accountId: string,
+    data: Partial<Cbe>
+  ): Promise<Cbe | null> {
+    const { accountNumber, accountName } = data;
+    const updateData: Partial<Cbe> = {};
+
+    if (accountNumber) {
+      const existingAccount = await this.prisma.cbe.findUnique({
+        where: { accountNumber },
+      });
+      if (existingAccount && existingAccount.id !== accountId) {
+        throw new BadRequestError("This account number is already registered");
+      }
+      updateData.accountNumber = accountNumber;
+    }
+    if (accountName) {
+      updateData.accountName = accountName;
+    }
+    if (Object.keys(updateData).length === 0) return null;
+
+    return this.prisma.cbe.update({
+      where: { id: accountId },
+      data: updateData,
+    });
+  }
+}
+
+/**
+ * Handler for TeleBirr payment method.
+ */
+class TeleBirrHandler extends PaymentMethodHandler {
+  async addAccount(req: Request, userId: string): Promise<TeleBirr> {
+    const validatedData = AddTeleBirrSchema.parse(req.body);
+    const { phoneNumber } = validatedData;
+    const { isDefault = false } = req.body;
+
+    const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
+      where: {
+        type: PaymentMethodType.MOBILE_MONEY,
+        currency: FiatCurrency.ETB,
+        isActive: true,
+      },
+    });
+
+    if (!supportedMethod) {
+      throw new BadRequestError("TeleBirr is not currently supported");
+    }
+
+    const existingAccount = await this.prisma.teleBirr.findUnique({
+      where: { phoneNumber },
+    });
+
+    if (existingAccount) {
+      throw new BadRequestError("This phone number is already registered");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await this.handleIsDefault(tx, userId, isDefault);
+
+      const userPaymentMethod = await tx.userPaymentMethod.create({
+        data: {
+          userId,
+          supportedPaymentMethodId: supportedMethod.id,
+          isDefault,
+        },
+      });
+
+      return tx.teleBirr.create({
+        data: {
+          id: userPaymentMethod.id,
+          phoneNumber,
+        },
+        include: {
+          userPaymentMethod: { include: { supportedPaymentMethod: true } },
+        },
+      });
+    });
+  }
+
+  async getAccounts(userId: string): Promise<TeleBirr[]> {
+    return this.prisma.teleBirr.findMany({
+      where: { userPaymentMethod: { userId } },
+      include: {
+        userPaymentMethod: { include: { supportedPaymentMethod: true } },
+      },
+    });
+  }
+
+  async updateAccount(
+    accountId: string,
+    data: Partial<TeleBirr>
+  ): Promise<TeleBirr | null> {
+    const { phoneNumber, accountName } = data;
+    const updateData: Partial<TeleBirr> = {};
+
+    if (phoneNumber) {
+      const existingAccount = await this.prisma.teleBirr.findUnique({
+        where: { phoneNumber },
+      });
+      if (existingAccount && existingAccount.id !== accountId) {
+        throw new BadRequestError("This phone number is already registered");
+      }
+      updateData.phoneNumber = phoneNumber;
+    }
+    if (accountName) {
+      updateData.accountName = accountName;
+    }
+    if (Object.keys(updateData).length === 0) return null;
+
+    return this.prisma.teleBirr.update({
+      where: { id: accountId },
+      data: updateData,
+    });
+  }
+}
+
+/**
+ * The main controller for handling all payment-related API requests.
  */
 export class PaymentController {
   private prisma: PrismaClient;
+  private handlers: Map<string, PaymentMethodHandler>;
 
+  /**
+   * @param {PrismaClient} prismaClient The Prisma client instance.
+   */
   constructor(prismaClient: PrismaClient) {
     this.prisma = prismaClient;
+    this.handlers = new Map();
+    this.handlers.set("mpesa-kenya", new MPesaKenyaHandler(prismaClient));
+    this.handlers.set("cbe", new CBEHandler(prismaClient));
+    this.handlers.set("telebirr", new TeleBirrHandler(prismaClient));
   }
 
-  private handleError(res: Response, error: any, context: string) {
+  /**
+   * Extracts the userId from the request object.
+   * @param {AuthenticatedRequest} req The Express request object.
+   * @returns {string} The user's ID.
+   * @throws {UnauthenticatedError} If the userId is not present.
+   */
+  private getUserId(req: AuthenticatedRequest): string {
+    const userId = req.userId;
+    if (!userId) {
+      throw new UnauthenticatedError("Authentication required");
+    }
+    return userId;
+  }
+
+  /**
+   * Retrieves the appropriate payment method handler.
+   * @param {string} methodName The name of the payment method.
+   * @returns {PaymentMethodHandler} The payment method handler instance.
+   * @throws {BadRequestError} If the payment method is not supported.
+   */
+  private getHandler(methodName: string): PaymentMethodHandler {
+    const handler = this.handlers.get(methodName);
+    if (!handler) {
+      throw new BadRequestError(`Unsupported payment method: ${methodName}`);
+    }
+    return handler;
+  }
+
+  /**
+   * Sends a standardized success response.
+   * @template T The type of the data to include.
+   * @param {Response} res The Express response object.
+   * @param {T} [data] The data to send.
+   * @param {string} [message] A success message.
+   */
+  private sendSuccess<T>(res: Response, data?: T, message?: string): void {
+    const response: ApiResponse<T> = { success: true, data, message };
+    res.status(200).json(response);
+  }
+
+  /**
+   * Sends a standardized error response.
+   * @param {Response} res The Express response object.
+   * @param {unknown} error The error object.
+   * @param {string} context The context of the error (e.g., method name).
+   */
+  private sendError(res: Response, error: unknown, context: string): void {
     console.error(`${context} error:`, error);
-    const message = error?.message ?? "Internal Server Error";
-    res.status(500).json({ message: `${context} failed: ${message}` });
+    let statusCode = 500;
+    let errorMessage = "Internal server error";
+
+    if (error instanceof UnauthenticatedError) {
+      statusCode = 401;
+      errorMessage = error.message;
+    } else if (error instanceof UnauthorizedError) {
+      statusCode = 403;
+      errorMessage = error.message;
+    } else if (error instanceof BadRequestError) {
+      statusCode = 400;
+      errorMessage = error.message;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+
+    const response: ApiResponse = {
+      success: false,
+      error: errorMessage,
+    };
+    res.status(statusCode).json(response);
   }
 
-  private async addPaymentAccount<T>(
+  /**
+   * Gets all supported payment methods.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
+   */
+  async getAllSupportedPaymentMethods(
     req: Request,
-    res: Response,
-    paymentMethodType: PaymentMethodType,
-    createNested: (
-      tx: Prisma.TransactionClient,
-      userId: string,
-      data: any,
-      isDefault: boolean
-    ) => Promise<T>
+    res: Response
   ): Promise<void> {
     try {
-      const userId = (req as any).userId as string;
-      if (!userId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
-
-      const { isDefault = false, ...details } = req.body;
-
-      const existingCount = await this.prisma.userPaymentMethod.count({
-        where: { userId },
+      this.getUserId(req);
+      const methods: Pick<
+        SupportedPaymentMethod,
+        "id" | "type" | "method" | "currency"
+      >[] = await this.prisma.supportedPaymentMethod.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          type: true,
+          method: true,
+          currency: true,
+        },
       });
-      const markDefault = isDefault || existingCount === 0;
-
-      if (markDefault && existingCount > 0) {
-        await this.prisma.userPaymentMethod.updateMany({
-          where: { userId, isDefault: true },
-          data: { isDefault: false },
-        });
-      }
-
-      const account = await this.prisma.$transaction((tx) =>
-        createNested(tx, userId, details, markDefault)
+      this.sendSuccess(
+        res,
+        methods,
+        "Supported payment methods retrieved successfully"
       );
-
-      res.status(201).json({
-        account,
-        message: `${paymentMethodType} account added successfully.`,
-      });
     } catch (error) {
-      this.handleError(res, error, `add${paymentMethodType}`);
+      this.sendError(res, error, "getAllSupportedPaymentMethods");
     }
   }
 
   /**
-   * Fetches the best buy and sell rates for a given fiat currency and payment method from the database.
-   * @param fiatCurrency - The fiat currency to filter rates by (e.g., "KES").
-   * @param paymentMethod - The payment method to filter rates by (e.g., "MPesaKenya").
-   * @returns An object containing the best buy and sell rates, limits, and other details,
-   *          or null if no rates are found or an error occurs.
+   * Adds a new payment method account.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
    */
-  private async getPaymentAccounts<T>(
-    req: Request,
-    res: Response,
-    findMany: (userId: string) => Promise<T[]>
-  ): Promise<void> {
+  async addPaymentMethod(req: Request, res: Response): Promise<void> {
     try {
-      const userId = (req as any).userId as string;
-      if (!userId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
-      const items = await findMany(userId);
-      res.status(200).json(items);
+      const userId = this.getUserId(req);
+      const { methodName } = req.params;
+      const handler = this.getHandler(methodName);
+      const account = await handler.addAccount(req, userId);
+      this.sendSuccess(
+        res,
+        account,
+        `${methodName} account added successfully`
+      );
     } catch (error) {
-      this.handleError(res, error, "getPaymentAccounts");
+      this.sendError(res, error, "addPaymentMethod");
     }
   }
 
   /**
-   * Adds a new MPesa payment account for the authenticated user.
-   * @param req - The request object containing user information and account details.
-   * @param res - The response object used to send the result back to the client.
+   * Retrieves a user's payment accounts for a specific method.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
    */
-  async addMPesa(req: Request, res: Response): Promise<void> {
-    await this.addPaymentAccount(
-      req,
-      res,
-      PaymentMethodType.MOBILE_MONEY,
-      async (tx, userId, details, isDefault) => {
-        return tx.paymentAccount.create({
-          data: {
-            userId,
-            type: PaymentMethodType.MOBILE_MONEY,
-            currency: FiatCurrency.KES,
-            details: { phoneNumber: details.phoneNumber },
-            mpesaKenya: { create: { phoneNumber: details.phoneNumber } },
-            userLinks: { create: { userId, isDefault } },
-          },
-          include: { mpesaKenya: true, userLinks: true },
-        });
-      }
-    );
+  async getPaymentMethods(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = this.getUserId(req);
+      const { methodName } = req.params;
+      const handler = this.getHandler(methodName);
+      const accounts = await handler.getAccounts(userId);
+      this.sendSuccess(
+        res,
+        accounts,
+        `${methodName} accounts retrieved successfully`
+      );
+    } catch (error) {
+      this.sendError(res, error, "getPaymentMethods");
+    }
   }
 
   /**
-   * Retrieves all MPesa accounts for the authenticated user.
-   * @param req - The request object containing user information.
-   * @param res - The response object used to send the result back to the client.
-   */
-  async getMPesaAccounts(req: Request, res: Response): Promise<void> {
-    await this.getPaymentAccounts(req, res, async (userId) => {
-      return this.prisma.paymentAccount.findMany({
-        where: { userId, type: PaymentMethodType.MOBILE_MONEY },
-        include: { userLinks: true, mpesaKenya: true },
-      });
-    });
-  }
-
-  /**
-   * Adds a new CBE Bank account for the authenticated user.
-   * @param req - The request object containing user information and account details.
-   * @param res - The response object used to send the result back to the client.
-   */
-  async addCBE(req: Request, res: Response): Promise<void> {
-    await this.addPaymentAccount(
-      req,
-      res,
-      PaymentMethodType.BANK_ACCOUNT,
-      async (tx, userId, details, isDefault) => {
-        return tx.paymentAccount.create({
-          data: {
-            userId,
-            type: PaymentMethodType.BANK_ACCOUNT,
-            currency: FiatCurrency.ETB,
-            details: { accountNumber: details.accountNumber },
-            cbe: { create: { accountNumber: details.accountNumber } },
-            userLinks: { create: { userId, isDefault } },
-          },
-          include: { cbe: true, userLinks: true },
-        });
-      }
-    );
-  }
-
-  /**
-   * Retrieves all CBE Bank accounts for the authenticated user.
-   * @param req - The request object containing user information.
-   * @param res - The response object used to send the result back to the client.
-   */
-  async getCBEAccounts(req: Request, res: Response): Promise<void> {
-    await this.getPaymentAccounts(req, res, async (userId) => {
-      return this.prisma.paymentAccount.findMany({
-        where: { userId, type: PaymentMethodType.BANK_ACCOUNT },
-        include: { userLinks: true, cbe: true },
-      });
-    });
-  }
-
-  /**
-   * Retrieves all payment methods for a given fiat currency.
-   * @param req - The request object containing user information and currency.
-   * @param res - The response object used to send the result back to the client.
+   * Retrieves a user's payment methods filtered by currency.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
    */
   async getPaymentMethodsByCurrency(
     req: Request,
     res: Response
   ): Promise<void> {
     try {
-      const userId = (req as any).userId as string;
+      const userId = this.getUserId(req);
       const { fiatCurrency } = req.params;
-      if (!userId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
+      const currency = fiatCurrency.toUpperCase() as FiatCurrency;
 
-      const currency = (fiatCurrency as string).toUpperCase() as FiatCurrency;
       if (!Object.values(FiatCurrency).includes(currency)) {
-        res.status(400).json({ message: `Invalid currency: ${fiatCurrency}` });
-        return;
+        throw new BadRequestError(`Invalid currency: ${fiatCurrency}`);
       }
 
-      const accounts = await this.prisma.paymentAccount.findMany({
-        where: { userId, currency },
-        include: { userLinks: true },
-      });
+      const accounts: UserPaymentMethodDetails[] =
+        await this.prisma.userPaymentMethod.findMany({
+          where: {
+            userId,
+            supportedPaymentMethod: {
+              currency,
+              isActive: true,
+            },
+          },
+          include: {
+            supportedPaymentMethod: true,
+            mpesaKenya: true,
+            cbe: true,
+            telebirr: true,
+          },
+        });
 
-      res.status(200).json(accounts);
+      this.sendSuccess(res, accounts, "Payment methods retrieved successfully");
     } catch (error) {
-      this.handleError(res, error, "getPaymentMethodsByCurrency");
+      this.sendError(res, error, "getPaymentMethodsByCurrency");
     }
   }
 
   /**
-   * Updates an existing payment method for the authenticated user.
-   * @param req - The request object containing user information and updated payment method details.
-   * @param res - The response object used to send the result back to the client.
+   * Updates a specific payment method account.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
    */
   async updatePaymentMethod(req: Request, res: Response): Promise<void> {
     try {
-      const userId = (req as any).userId as string;
+      const userId = this.getUserId(req);
       const { paymentMethodId } = req.params;
-      if (!userId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
-      }
+      const { isDefault, ...details } = req.body;
 
-      const { isDefault, phoneNumber, accountNumber } = req.body;
+      const paymentMethod: UserPaymentMethodDetails | null =
+        await this.prisma.userPaymentMethod.findFirst({
+          where: { id: paymentMethodId, userId },
+          include: {
+            supportedPaymentMethod: true,
+            mpesaKenya: true,
+            cbe: true,
+            telebirr: true,
+          },
+        });
 
-      const link = await this.prisma.userPaymentMethod.findUnique({
-        where: { id: paymentMethodId },
-        include: { account: true },
-      });
-      if (!link || link.userId !== userId) {
-        res.status(404).json({ message: "Payment method not found." });
-        return;
+      if (!paymentMethod) {
+        throw new BadRequestError("Payment method not found");
       }
 
       await this.prisma.$transaction(async (tx) => {
-        const detailUpdates: Record<string, any> = {};
-        if (phoneNumber) detailUpdates.phoneNumber = phoneNumber;
-        if (accountNumber) detailUpdates.accountNumber = accountNumber;
-        if (Object.keys(detailUpdates).length) {
-          await tx.paymentAccount.update({
-            where: { id: link.paymentAccountId },
-            data: { details: detailUpdates },
-          });
-        }
-
-        if (
-          link.account.type === PaymentMethodType.MOBILE_MONEY &&
-          phoneNumber
-        ) {
-          await tx.mPesaKenya.update({
-            where: { accountId: link.paymentAccountId },
-            data: { phoneNumber },
-          });
-        }
-        if (
-          link.account.type === PaymentMethodType.BANK_ACCOUNT &&
-          accountNumber
-        ) {
-          await tx.cBE.update({
-            where: { accountId: link.paymentAccountId },
-            data: { accountNumber },
-          });
+        if (Object.keys(details).length > 0) {
+          if (paymentMethod.mpesaKenya) {
+            await this.getHandler("mpesa-kenya").updateAccount(
+              paymentMethodId,
+              details as Partial<MPesaKenya>
+            );
+          } else if (paymentMethod.cbe) {
+            await this.getHandler("cbe").updateAccount(
+              paymentMethodId,
+              details as Partial<Cbe>
+            );
+          } else if (paymentMethod.telebirr) {
+            await this.getHandler("telebirr").updateAccount(
+              paymentMethodId,
+              details as Partial<TeleBirr>
+            );
+          }
         }
 
         if (typeof isDefault === "boolean") {
@@ -299,64 +624,74 @@ export class PaymentController {
         }
       });
 
-      res.status(200).json({ message: "Payment method updated successfully." });
+      this.sendSuccess(res, null, "Payment method updated successfully");
     } catch (error) {
-      this.handleError(res, error, "updatePaymentMethod");
+      this.sendError(res, error, "updatePaymentMethod");
     }
   }
 
   /**
-   * Deletes a payment method for the authenticated user.
-   * @param req - The request object containing user information and payment method ID.
-   * @param res - The response object used to send the result back to the client.
+   * Deletes a user's payment method.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
    */
   async deletePaymentMethod(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.userId;
+      const userId = this.getUserId(req);
       const { paymentMethodId } = req.params;
-      if (!userId) {
-        res.status(401).json({ message: "Unauthorized" });
-        return;
+
+      const paymentMethod = await this.prisma.userPaymentMethod.findFirst({
+        where: { id: paymentMethodId, userId },
+      });
+
+      if (!paymentMethod) {
+        throw new BadRequestError("Payment method not found");
       }
 
-      const link = await this.prisma.userPaymentMethod.findUnique({
+      await this.prisma.userPaymentMethod.delete({
         where: { id: paymentMethodId },
       });
-      if (!link || link.userId !== userId) {
-        res.status(404).json({ message: "Payment method not found." });
-        return;
-      }
 
-      await this.prisma.$transaction(async (tx) => {
-        await tx.userPaymentMethod.delete({ where: { id: paymentMethodId } });
-        await tx.paymentAccount.delete({
-          where: { id: link.paymentAccountId },
-        });
-      });
-
-      res.status(200).json({ message: "Payment method deleted successfully." });
+      this.sendSuccess(res, null, "Payment method deleted successfully");
     } catch (error) {
-      this.handleError(res, error, "deletePaymentMethod");
+      this.sendError(res, error, "deletePaymentMethod");
     }
   }
 
   /**
-   * Sets up the routes for the payment methods.
-   * @returns The router instance with the defined routes.
+   * Defines and returns the Express router for payment-related endpoints.
+   * @returns {Router} The Express router instance.
    */
   routes(): Router {
     const router = Router();
-    router.get("/", this.getPaymentMethodsByCurrency.bind(this));
 
-    router.post("/mpesa-kenya", this.addMPesa.bind(this));
-    router.get("/mpesa-kenya", this.getMPesaAccounts.bind(this));
+    router.get(
+      "/supported-methods",
+      asyncWrapper(this.getAllSupportedPaymentMethods.bind(this))
+    );
 
-    router.post("/cbe", this.addCBE.bind(this));
-    router.get("/cbe", this.getCBEAccounts.bind(this));
+    router.post(
+      "/methods/:methodName",
+      asyncWrapper(this.addPaymentMethod.bind(this))
+    );
+    router.get(
+      "/methods/:methodName",
+      asyncWrapper(this.getPaymentMethods.bind(this))
+    );
 
-    router.get("/:fiatCurrency", this.getPaymentMethodsByCurrency.bind(this));
-    router.put("/:paymentMethodId", this.updatePaymentMethod.bind(this));
-    router.delete("/:paymentMethodId", this.deletePaymentMethod.bind(this));
+    router.get(
+      "/currency/:fiatCurrency",
+      asyncWrapper(this.getPaymentMethodsByCurrency.bind(this))
+    );
+    router.put(
+      "/methods/:paymentMethodId",
+      asyncWrapper(this.updatePaymentMethod.bind(this))
+    );
+    router.delete(
+      "/methods/:paymentMethodId",
+      asyncWrapper(this.deletePaymentMethod.bind(this))
+    );
+
     return router;
   }
 }

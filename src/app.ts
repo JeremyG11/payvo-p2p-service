@@ -6,7 +6,7 @@ import cookieParser from "cookie-parser";
 import express, { Application, Request, Response } from "express";
 
 import routes from "@/routes";
-import { errorHandler } from "@/middlewares/error";
+import { globalErrorHandler, notFoundHandler } from "@/middlewares/error";
 import cron from "./cron";
 
 const app: Application = express();
@@ -63,7 +63,8 @@ app.get("/api/v1/p2p/health", (req: Request, res: Response) => {
 
 app.use("/api/v1/p2p", routes);
 
-app.use(errorHandler);
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
 
 cron;
 

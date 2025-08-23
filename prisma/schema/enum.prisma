@@ -42,3 +42,5 @@ enum PaymentMethodType {
   MOBILE_MONEY
   BANK_ACCOUNT  
 }
+
+ 

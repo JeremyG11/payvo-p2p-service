@@ -16,7 +16,7 @@ importers:
         version: git+https://git@github.com:JeremyG11/payvo-logger.git#6455c4547efd5a79314b0e8e093e42c36f03de98
       '@payvo/redis':
         specifier: git+https://github.com/JeremyG11/payvo-redis.git#main
-        version: git+https://git@github.com:JeremyG11/payvo-redis.git#67c3efbc62320981a91f321af430e2e417329612(@redis/client@5.6.0)
+        version: git+https://git@github.com:JeremyG11/payvo-redis.git#67c3efbc62320981a91f321af430e2e417329612(@redis/client@5.8.2)
       '@prisma/client':
         specifier: 6.11.1
         version: 6.11.1(prisma@6.11.1(typescript@5.8.3))(typescript@5.8.3)
@@ -59,6 +59,9 @@ importers:
       nodemailer:
         specifier: ^6.10.0
         version: 6.10.1
+      redis:
+        specifier: ^5.8.2
+        version: 5.8.2
       tsup:
         specifier: ^8.5.0
         version: 8.5.0(jiti@2.4.2)(postcss@8.5.6)(typescript@5.8.3)
@@ -68,6 +71,9 @@ importers:
       winston:
         specifier: ^3.17.0
         version: 3.17.0
+      zod:
+        specifier: ^4.0.17
+        version: 4.0.17
     devDependencies:
       '@types/cookie-parser':
         specifier: ^1.4.8
@@ -371,15 +377,21 @@ packages:
     peerDependencies:
       '@redis/client': ^5.6.0
 
-  '@redis/client@5.6.0':
-    resolution: {integrity: sha512-wmP9kCFElCSr4MM4+1E4VckDuN4wLtiXSM/J0rKVQppajxQhowci89RGZr2OdLualowb8SRJ/R6OjsXrn9ZNFA==}
-    engines: {node: '>= 18'}
-
-  '@redis/json@5.6.0':
-    resolution: {integrity: sha512-YQN9ZqaSDpdLfJqwzcF4WeuJMGru/h4WsV7GeeNtXsSeyQjHTyDxrd48xXfRRJGv7HitA7zGnzdHplNeKOgrZA==}
+  '@redis/bloom@5.8.2':
+    resolution: {integrity: sha512-855DR0ChetZLarblio5eM0yLwxA9Dqq50t8StXKp5bAtLT0G+rZ+eRzzqxl37sPqQKjUudSYypz55o6nNhbz0A==}
     engines: {node: '>= 18'}
     peerDependencies:
-      '@redis/client': ^5.6.0
+      '@redis/client': ^5.8.2
+
+  '@redis/client@5.8.2':
+    resolution: {integrity: sha512-WtMScno3+eBpTac1Uav2zugXEoXqaU23YznwvFgkPwBQVwEHTDgOG7uEAObtZ/Nyn8SmAMbqkEubJaMOvnqdsQ==}
+    engines: {node: '>= 18'}
+
+  '@redis/json@5.8.2':
+    resolution: {integrity: sha512-uxpVfas3I0LccBX9rIfDgJ0dBrUa3+0Gc8sEwmQQH0vHi7C1Rx1Qn8Nv1QWz5bohoeIXMICFZRcyDONvum2l/w==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      '@redis/client': ^5.8.2
 
   '@redis/search@5.6.0':
     resolution: {integrity: sha512-sLgQl92EyMVNHtri5K8Q0j2xt9c0cO9HYurXz667Un4xeUYR+B/Dw5lLG35yqO7VvVxb9amHJo9sAWumkKZYwA==}
@@ -387,11 +399,23 @@ packages:
     peerDependencies:
       '@redis/client': ^5.6.0
 
+  '@redis/search@5.8.2':
+    resolution: {integrity: sha512-cNv7HlgayavCBXqPXgaS97DRPVWFznuzsAmmuemi2TMCx5scwLiP50TeZvUS06h/MG96YNPe6A0Zt57yayfxwA==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      '@redis/client': ^5.8.2
+
   '@redis/time-series@5.6.0':
     resolution: {integrity: sha512-tXABmN1vu4aTNL3WI4Iolpvx/5jgil2Bs31ozvKblT+jkUoRkk8ykmYo9Pv/Mp7Gk6/Qkr/2rMgVminrt/4BBQ==}
     engines: {node: '>= 18'}
     peerDependencies:
       '@redis/client': ^5.6.0
+
+  '@redis/time-series@5.8.2':
+    resolution: {integrity: sha512-g2NlHM07fK8H4k+613NBsk3y70R2JIM2dPMSkhIjl2Z17SYvaYKdusz85d7VYOrZBWtDrHV/WD2E3vGu+zni8A==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      '@redis/client': ^5.8.2
 
   '@rollup/rollup-android-arm-eabi@4.44.2':
     resolution: {integrity: sha512-g0dF8P1e2QYPOj1gu7s/3LVP6kze9A7m6x0BZ9iTdXK8N5c2V7cpBKHV3/9A4Zd8xxavdhK0t4PnqjkqVmUc9Q==}
@@ -1501,8 +1525,8 @@ packages:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
     engines: {node: '>= 14.18.0'}
 
-  redis@5.6.0:
-    resolution: {integrity: sha512-0x3pM3SlYA5azdNwO8qgfMBzoOqSqr9M+sd1hojbcn0ZDM5zsmKeMM+zpTp6LIY+mbQomIc/RTTQKuBzr8QKzQ==}
+  redis@5.8.2:
+    resolution: {integrity: sha512-31vunZj07++Y1vcFGcnNWEf5jPoTkGARgfWI4+Tk55vdwHxhAvug8VEtW7Cx+/h47NuJTEg/JL77zAwC6E0OeA==}
     engines: {node: '>= 18'}
 
   require-directory@2.1.1:
@@ -1928,6 +1952,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@4.0.17:
+    resolution: {integrity: sha512-1PHjlYRevNxxdy2JZ8JcNAw7rX8V9P1AKkP+x/xZfxB0K5FYfuV+Ug6P/6NVSR2jHQ+FzDDoDHS04nYUsOIyLQ==}
+
 snapshots:
 
   '@ampproject/remapping@2.3.0':
@@ -2079,13 +2106,13 @@ snapshots:
     dependencies:
       winston: 3.17.0
 
-  '@payvo/redis@git+https://git@github.com:JeremyG11/payvo-redis.git#67c3efbc62320981a91f321af430e2e417329612(@redis/client@5.6.0)':
+  '@payvo/redis@git+https://git@github.com:JeremyG11/payvo-redis.git#67c3efbc62320981a91f321af430e2e417329612(@redis/client@5.8.2)':
     dependencies:
       '@payvo/logger': git+https://git@github.com:JeremyG11/payvo-logger.git#6455c4547efd5a79314b0e8e093e42c36f03de98
-      '@redis/bloom': 5.6.0(@redis/client@5.6.0)
-      '@redis/search': 5.6.0(@redis/client@5.6.0)
-      '@redis/time-series': 5.6.0(@redis/client@5.6.0)
-      redis: 5.6.0
+      '@redis/bloom': 5.6.0(@redis/client@5.8.2)
+      '@redis/search': 5.6.0(@redis/client@5.8.2)
+      '@redis/time-series': 5.6.0(@redis/client@5.8.2)
+      redis: 5.8.2
       winston: 3.17.0
     transitivePeerDependencies:
       - '@redis/client'
@@ -2123,25 +2150,37 @@ snapshots:
     dependencies:
       '@prisma/debug': 6.11.1
 
-  '@redis/bloom@5.6.0(@redis/client@5.6.0)':
+  '@redis/bloom@5.6.0(@redis/client@5.8.2)':
     dependencies:
-      '@redis/client': 5.6.0
+      '@redis/client': 5.8.2
 
-  '@redis/client@5.6.0':
+  '@redis/bloom@5.8.2(@redis/client@5.8.2)':
+    dependencies:
+      '@redis/client': 5.8.2
+
+  '@redis/client@5.8.2':
     dependencies:
       cluster-key-slot: 1.1.2
 
-  '@redis/json@5.6.0(@redis/client@5.6.0)':
+  '@redis/json@5.8.2(@redis/client@5.8.2)':
     dependencies:
-      '@redis/client': 5.6.0
+      '@redis/client': 5.8.2
 
-  '@redis/search@5.6.0(@redis/client@5.6.0)':
+  '@redis/search@5.6.0(@redis/client@5.8.2)':
     dependencies:
-      '@redis/client': 5.6.0
+      '@redis/client': 5.8.2
 
-  '@redis/time-series@5.6.0(@redis/client@5.6.0)':
+  '@redis/search@5.8.2(@redis/client@5.8.2)':
     dependencies:
-      '@redis/client': 5.6.0
+      '@redis/client': 5.8.2
+
+  '@redis/time-series@5.6.0(@redis/client@5.8.2)':
+    dependencies:
+      '@redis/client': 5.8.2
+
+  '@redis/time-series@5.8.2(@redis/client@5.8.2)':
+    dependencies:
+      '@redis/client': 5.8.2
 
   '@rollup/rollup-android-arm-eabi@4.44.2':
     optional: true
@@ -3224,13 +3263,13 @@ snapshots:
 
   readdirp@4.1.2: {}
 
-  redis@5.6.0:
+  redis@5.8.2:
     dependencies:
-      '@redis/bloom': 5.6.0(@redis/client@5.6.0)
-      '@redis/client': 5.6.0
-      '@redis/json': 5.6.0(@redis/client@5.6.0)
-      '@redis/search': 5.6.0(@redis/client@5.6.0)
-      '@redis/time-series': 5.6.0(@redis/client@5.6.0)
+      '@redis/bloom': 5.8.2(@redis/client@5.8.2)
+      '@redis/client': 5.8.2
+      '@redis/json': 5.8.2(@redis/client@5.8.2)
+      '@redis/search': 5.8.2(@redis/client@5.8.2)
+      '@redis/time-series': 5.8.2(@redis/client@5.8.2)
 
   require-directory@2.1.1: {}
 
@@ -3716,3 +3755,5 @@ snapshots:
   yn@3.1.1: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.0.17: {}

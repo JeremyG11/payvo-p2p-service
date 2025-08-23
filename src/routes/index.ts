@@ -5,8 +5,8 @@ import { PaymentController } from "@/controllers/payments";
 import { RateController } from "@/controllers/rates";
 
 const router: Router = express.Router();
-const rateControllerInstance = new RateController();
 const paymentController = new PaymentController(prisma);
+const rateControllerInstance = new RateController(prisma);
 
 router.use("/rates", rateControllerInstance.router);
 

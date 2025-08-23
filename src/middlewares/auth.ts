@@ -2,10 +2,10 @@ import "module-alias/register";
 import { logger } from "@/lib/logger";
 import { verifyJwt } from "@/lib/jwt";
 import { CachedAuthData } from "@/types";
+import { UserCacheFields } from "@/lib/cache-keys";
 import { Request, Response, NextFunction } from "express";
-import { getUserPermissions } from "@/lib/redis/get-user-permissions";
-import { isUserBlacklisted, isTokenBlacklisted } from "@/lib/authBlacklist";
-import { fetchUserPermissions } from "@/service/fetch-user-permissions";
+import { fetchUserPermissions } from "@/services/fetch-user";
+import { blacklistService, userCacheService } from "@/services/cache";
 
 export const authenticate = async (
   req: Request,
@@ -36,7 +36,7 @@ export const authenticate = async (
       return;
     }
 
-    if (await isUserBlacklisted(decoded.userId)) {
+    if (await blacklistService.isTokenBlacklisted(decoded.userId)) {
       logger.warn(`Access denied for blacklisted user: ${decoded.userId}`);
       res.status(403).json({
         code: "UserBlacklisted",
@@ -46,7 +46,10 @@ export const authenticate = async (
     }
 
     // Check this specific login session been blacklisted (e.g., via 'log out from all devices')
-    if (decoded.jti && (await isTokenBlacklisted(accessToken))) {
+    if (
+      decoded.jti &&
+      (await blacklistService.isTokenBlacklisted(accessToken))
+    ) {
       logger.warn(
         `Access denied for blacklisted session (jti): ${decoded.jti}`
       );
@@ -63,7 +66,10 @@ export const authenticate = async (
     let authData: CachedAuthData | null = null;
 
     try {
-      authData = await getUserPermissions(decoded.userId);
+      authData = await userCacheService.getUserData(
+        decoded.userId,
+        UserCacheFields.AuthData
+      );
     } catch (err) {
       logger.error(`Redis error for ${decoded.userId}:`, err);
     }
@@ -72,16 +78,16 @@ export const authenticate = async (
     if (!authData) {
       try {
         authData = await fetchUserPermissions(decoded.userId, accessToken);
-        // await redis().set(redisKey, JSON.stringify(authData), "EX", 60 * 60);
       } catch (err) {
         logger.error(
           `Failed to fetch/cache permissions for ${decoded.userId}:`,
           err
         );
-        return res.status(503).json({
+        res.status(503).json({
           code: "ServiceUnavailable",
           message: "Unable to retrieve permissions.",
         });
+        return;
       }
     }
 
@@ -90,10 +96,11 @@ export const authenticate = async (
       !authData.enumRole ||
       !Array.isArray(authData.permissions)
     ) {
-      return res.status(403).json({
+      res.status(403).json({
         code: "Forbidden",
         message: "User has no valid permissions.",
       });
+      return;
     }
 
     req.userEnumRole = authData.enumRole;

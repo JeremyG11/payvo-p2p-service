@@ -1,178 +1,109 @@
-// model FiatCryptoRate {
-//   id                  String    @id @default(uuid())
-//   source              String     
-//   fiatCurrency        String     
-//   cryptoCurrency      CryptoCurrency    @default(USDT) 
-//   rateType            RateType    
-//   paymentMethod       String?  
-//   rawRate             Decimal
-//   adjustedRate        Decimal?   
-//   marginPercentage    Decimal?
-//   volumeAvailable     Decimal?
-//   minLimit            Decimal?
-//   maxLimit            Decimal?
-//   adId                String?    
-//   isActive            Boolean   @default(true)
-//   fetchedAt           DateTime  @default(now())  
-//   expiresAt           DateTime?  
+model SupportedPaymentMethod {
+  id                      String               @id @default(uuid())
+  type                    PaymentMethodType
+  method                  String               
+  currency                FiatCurrency
+  isActive                Boolean              @default(true)
+  logo                    String?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
 
-//   createdAt           DateTime  @default(now())
-//   updatedAt           DateTime  @updatedAt
+  userPaymentMethods      UserPaymentMethod[]
+  rates                   FiatCryptoRate[]
 
-//   @@index([source])
-//   @@index([fiatCurrency])
-//   @@index([cryptoCurrency])
-//   @@index([rateType])
-//   @@index([paymentMethod])
-
-//   @@index([fiatCurrency, cryptoCurrency, paymentMethod, rateType])
-//   @@index([source, fetchedAt])
-// }
-
-
-
-// model MPesaKenya {
-//   id                String            @id @default(uuid())
-//   userId            String
-//   phoneNumber       String
-//   currency          FiatCurrency      @default(KES)
-
-//   isDefault         Boolean           @default(false)
-//   createdAt         DateTime          @default(now())
-//   updatedAt         DateTime          @updatedAt
-
-  
-//   @@index([userId])
-// }
-
-// model CBE {
-//   id                String            @id @default(uuid())
-//   userId            String
-//   accountNumber     String
-//   currency          FiatCurrency      @default(ETB)
-
-//   isDefault         Boolean           @default(false)
-//   createdAt         DateTime          @default(now())
-//   updatedAt         DateTime          @updatedAt
-
-//   @@index([userId])
-// }
-
-// model PaymentAccount {
-//   id             String           @id @default(uuid())
-//   userId         String
-//   type           PaymentMethodType
-//   currency       FiatCurrency
-
-//   accountNumber  String?          @unique  
-//   phoneNumber    String?          @unique  
-
-//   details        Json
-
-//   createdAt      DateTime         @default(now())
-//   updatedAt      DateTime         @updatedAt
-
-//   userLinks      UserPaymentMethod[]
-//   @@index([userId])
-// }
-
-
-
-// model UserPaymentMethod {
-//   id                String          @id @default(uuid())
-//   userId            String
-//   paymentAccountId  String          @unique
-//   isDefault         Boolean         @default(false)
-
-//   createdAt         DateTime        @default(now())
-//   updatedAt         DateTime        @updatedAt
-
-//   paymentAccount    PaymentAccount  @relation(fields: [paymentAccountId], references: [id])
-//   @@index([userId])
-// }
- 
-
- 
- 
-model FiatCryptoRate {
-  id                 String          @id @default(uuid())
-  source             String
-  fiatCurrency       FiatCurrency
-  cryptoCurrency     CryptoCurrency   @default(USDT)
-  rateType           RateType
-  paymentMethod      String?         
-  rawRate            Decimal         
-  adjustedRate       Decimal?        
-  marginPercentage   Decimal?            
-  volumeAvailable    Decimal?        
-  minLimit           Decimal?        
-  maxLimit           Decimal?        
-  adId               String?         
-  isActive           Boolean         @default(true)
-  
-  fetchedAt          DateTime        @default(now())       
-  expiresAt          DateTime?       
-  createdAt          DateTime        @default(now())       
-  updatedAt          DateTime        @updatedAt           
-
-  @@index([source])
-  @@index([fiatCurrency, cryptoCurrency])
-  @@index([fiatCurrency, cryptoCurrency, paymentMethod, rateType])
-  @@index([source, fetchedAt])
-}
-
-model PaymentAccount {
-  id              String               @id @default(uuid())
-  userId          String
-  type            PaymentMethodType
-  currency        FiatCurrency
-  details         Json                 @db.JsonB
-
-  cbe             CBE?
-  mpesaKenya      MPesaKenya?
-
-  createdAt       DateTime             @default(now())   @db.Timestamptz(6)
-  updatedAt       DateTime             @updatedAt        @db.Timestamptz(6)
-
-  userLinks       UserPaymentMethod[]
-
+  @@unique([method, currency])
   @@index([type])
+  @@index([method])
+  @@index([currency])
+  @@index([isActive])
 }
 
 model UserPaymentMethod {
-  id                String           @id @default(uuid())
-  userId            String
-  paymentAccountId  String
-  isDefault         Boolean          @default(false)
+  id                        String           @id @default(uuid())
+  userId                    String            
+  supportedPaymentMethodId  String
+  isDefault                 Boolean          @default(false)
+  userSpecificDetails       Json?            
 
-  createdAt         DateTime         @default(now())   @db.Timestamptz(6)
-  updatedAt         DateTime         @updatedAt        @db.Timestamptz(6)
+  mpesaKenya                MPesaKenya?
+  cbe                       Cbe?
+  telebirr                  TeleBirr?
 
-  account           PaymentAccount   @relation(fields: [paymentAccountId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
 
-  /// prevent duplicate links:
-  @@unique([userId, paymentAccountId])
+  supportedPaymentMethod  SupportedPaymentMethod @relation(fields: [supportedPaymentMethodId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, supportedPaymentMethodId])
   @@index([userId])
 }
 
 model MPesaKenya {
-  accountId     String           @id
-  phoneNumber   String           @unique
-  createdAt     DateTime         @default(now())   @db.Timestamptz(6)
-  updatedAt     DateTime         @updatedAt        @db.Timestamptz(6)
+  id                 String           @id @default(uuid())
+  phoneNumber        String           @unique
+  accountName        String?
+  
+  userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
 
-  account       PaymentAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
   @@map("mpesa_kenya")
 }
 
-model CBE {
-  accountId     String           @id
-  accountNumber String           @unique
-  createdAt     DateTime         @default(now())   @db.Timestamptz(6)
-  updatedAt     DateTime         @updatedAt        @db.Timestamptz(6)
+model Cbe {
+  id                 String           @id @default(uuid())
+  accountNumber      String           @unique
+  accountName        String
+  
+  userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
 
-  account       PaymentAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  @@map("cbe_bank")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
+  @@map("cbe")
 }
+
+model TeleBirr {
+  id                 String           @id @default(uuid())
+  phoneNumber        String           @unique
+  accountName        String?
+  
+  userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
+  @@map("telebirr")
+}
+
+model FiatCryptoRate {
+  id                 String             @id @default(uuid())
+  source             Source
+  fiatCurrency       FiatCurrency
+  cryptoCurrency     CryptoCurrency     @default(USDT)
+  rateType           RateType
+  paymentMethodId    String?            
+  rawRate            String            
+  adjustedRate       String?           
+  marginPercentage   String?           
+  volumeAvailable    String?           
+  minLimit           String?           
+  maxLimit           String?           
+  adId               String?         
+  isActive           Boolean            @default(true)
+  
+  fetchedAt          DateTime           @default(now())       
+  expiresAt          DateTime?       
+  createdAt          DateTime           @default(now())       
+  updatedAt          DateTime           @updatedAt
+
+  paymentMethod      SupportedPaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([source])
+  @@index([fiatCurrency, cryptoCurrency])
+  @@index([fiatCurrency, cryptoCurrency, paymentMethodId, rateType])
+  @@index([source, fetchedAt])
+}
+
+ 

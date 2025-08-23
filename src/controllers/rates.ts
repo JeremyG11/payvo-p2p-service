@@ -6,50 +6,116 @@ import {
   PrismaClient,
   RateType,
 } from "@prisma/client";
+import {
+  AppError,
+  BadRequestError,
+  InternalServerError,
+  NotFoundError,
+} from "@/lib/error";
+import { asyncWrapper } from "@/middlewares/error";
 
+/**
+ * A helper type for supported payment methods
+ */
+export type TSupportedPaymentMethod =
+  | KenyaPaymentMethod
+  | EthiopiaPaymentMethod;
+
+/**
+ * Controller for handling exchange rate-related API requests.
+ * All methods now use the asyncWrapper and custom AppErrors.
+ */
 export class RateController {
-  private prisma: PrismaClient;
   public router: Router;
+  private prisma: PrismaClient;
 
-  constructor() {
-    this.prisma = new PrismaClient();
+  constructor(prismaClient: PrismaClient) {
+    this.prisma = prismaClient;
     this.router = Router();
     this.routes();
   }
 
   /**
-   * Fetches the best rates for USDT/KES with MPesa Kenya payment method.
-   * @param req - The request object containing user information.
-   * @param res - The response object used to send the result back to the client.
-   * @returns The best rates for USDT/KES or an error message.
+   * Fetches the best buy and sell rates for a specific fiat currency and payment method.
+   * This is a private helper to centralize the core logic, improving reusability.
+   *
+   * @param fiatCurrency - The fiat currency (e.g., FiatCurrency.KES).
+   * @param paymentMethodName - The name of the payment method (e.g., "MPesaKenya").
+   * @returns An object containing the best rates and limits.
+   * @throws {NotFoundError} if no rates are found for the given criteria.
+   * @throws {InternalServerError} for any unexpected database errors.
    */
-  private async getBestRatesFromDB(
+  private async getBestRates(
     fiatCurrency: FiatCurrency,
-    paymentMethod: string
-  ): Promise<any | null> {
+    paymentMethodName: TSupportedPaymentMethod
+  ): Promise<any> {
     try {
+      /**
+       * Find the ID of the supported payment method
+       * Throws NotFoundError if the method doesn't exist
+       * in the database for the specified fiat currency.
+       */
+      const supportedMethod =
+        await this.prisma.supportedPaymentMethod.findUnique({
+          where: {
+            method_currency: {
+              method: paymentMethodName,
+              currency: fiatCurrency,
+            },
+          },
+        });
+
+      if (!supportedMethod) {
+        throw new NotFoundError(
+          `Payment method '${paymentMethodName}' not found for currency '${fiatCurrency}'.`
+        );
+      }
+
+      const paymentMethodId = supportedMethod.id;
+
+      /**
+       * Query the best buy and sell rates from the database.
+       * I define a common where clause to avoid repetition.
+       */
+      const whereClause = {
+        fiatCurrency,
+        paymentMethodId,
+      };
+
+      /**
+       * Fetch the best buy rate (lowest rate)
+       * Note: Using 'asc' to get the lowest rate first
+       */
       const bestBuyRate = await this.prisma.fiatCryptoRate.findFirst({
         where: {
-          fiatCurrency,
-          paymentMethod,
+          ...whereClause,
           rateType: RateType.BUY,
         },
         orderBy: [{ rawRate: "asc" }, { fetchedAt: "desc" }],
       });
 
+      /**
+       * Fetch the best sell rate (highest rate)
+       * Note: Using 'desc' to get the highest rate first
+       */
       const bestSellRate = await this.prisma.fiatCryptoRate.findFirst({
         where: {
-          fiatCurrency,
-          paymentMethod,
+          ...whereClause,
           rateType: RateType.SELL,
         },
         orderBy: [{ rawRate: "desc" }, { fetchedAt: "desc" }],
       });
 
+      if (!bestBuyRate && !bestSellRate) {
+        throw new NotFoundError(
+          `No rates found for ${fiatCurrency} with ${paymentMethodName}.`
+        );
+      }
+
       return {
-        exchange: "Binance",
+        source: "Binance",
         currencyPair: `USDT_${fiatCurrency}`,
-        paymentMethod,
+        paymentMethod: paymentMethodName,
         bestBuy: bestBuyRate?.adjustedRate ?? bestBuyRate?.rawRate ?? null,
         bestSell: bestSellRate?.adjustedRate ?? bestSellRate?.rawRate ?? null,
         rawBuyRate: bestBuyRate?.rawRate ?? null,
@@ -67,23 +133,63 @@ export class RateController {
         fetchedAt: bestBuyRate?.fetchedAt ?? bestSellRate?.fetchedAt ?? null,
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       console.error("Error fetching best rates from DB:", error);
-      return null;
+      throw new InternalServerError(
+        "Failed to fetch rates due to a server error."
+      );
     }
   }
 
   /**
-   * Fetches *all* rates for a given fiat currency, regardless of paymentMethod.
+   * Fetches the best USDT rates for a specified fiat currency and payment method.
+   * This combines the logic of the previous two separate routes into one generic endpoint.
+   *
+   * @param req - The request object. Expects 'fiatCurrency' and 'paymentMethod' as parameters.
+   * @param res - The response object.
+   */
+  public getBestRatesForPair = async (req: Request, res: Response) => {
+    const { fiatCurrency, paymentMethod } = req.params;
+    const currency = (fiatCurrency as string).toUpperCase() as FiatCurrency;
+
+    // Validate if the currency is supported
+    if (!Object.values(FiatCurrency).includes(currency)) {
+      throw new BadRequestError(`Invalid currency: ${fiatCurrency}`);
+    }
+
+    // Since paymentMethod is from req.params, it's a string, so we need to
+    // validate it against the union type.
+    const allPaymentMethods = {
+      ...KenyaPaymentMethod,
+      ...EthiopiaPaymentMethod,
+    };
+    if (
+      !Object.values(allPaymentMethods).includes(
+        paymentMethod as TSupportedPaymentMethod
+      )
+    ) {
+      throw new BadRequestError(`Invalid payment method: ${paymentMethod}`);
+    }
+
+    const rates = await this.getBestRates(
+      currency,
+      paymentMethod as TSupportedPaymentMethod
+    );
+    res.status(200).json(rates);
+  };
+
+  /**
+   * Fetches *all* rates for a given fiat currency.
+   * This method has been updated to use the custom BadRequestError.
    */
   public getRatesByCurrency = async (req: Request, res: Response) => {
     const { fiatCurrency } = req.params;
     const currency = (fiatCurrency as string).toUpperCase() as FiatCurrency;
 
-    // validate enum
     if (!Object.values(FiatCurrency).includes(currency)) {
-      return res
-        .status(400)
-        .json({ error: `Invalid currency: ${fiatCurrency}` });
+      throw new BadRequestError(`Invalid currency: ${fiatCurrency}`);
     }
 
     try {
@@ -91,64 +197,31 @@ export class RateController {
         where: { fiatCurrency: currency },
         orderBy: [{ fetchedAt: "desc" }],
       });
-      return res.status(200).json(rates);
+      res.status(200).json(rates);
     } catch (error) {
       console.error("Error fetching all rates by currency:", error);
-      return res
-        .status(500)
-        .json({ error: `Failed to fetch rates for ${currency}.` });
+      throw new InternalServerError(`Failed to fetch rates for ${currency}.`);
     }
   };
 
   /**
-   * Fetches the best USDT/KES rates for the specified payment method.
-   * @param req - The request object containing user information.
-   * @param res - The response object used to send the result back to the client.
-   * @returns The best rates for USDT/KES or an error message.
+   * Defines all the API routes for the controller.
+   * The new routes are cleaner and more dynamic.
    */
-  public getUSDTKESWithMpesaKenyaRates = async (
-    req: Request,
-    res: Response
-  ) => {
-    const paymentMethod = KenyaPaymentMethod.MPesaKenya;
-    const rates = await this.getBestRatesFromDB(
-      FiatCurrency.KES,
-      paymentMethod
-    );
-    if (rates) {
-      res.status(200).json(rates);
-    } else {
-      res.status(500).json({
-        error: `Failed to fetch USDT/KES rates for ${paymentMethod}.`,
-      });
-    }
-  };
-
-  /**
-   * Fetches the best USDT/ETB rates for the specified payment method.
-   * @param req - The request object containing user information.
-   * @param res - The response object used to send the result back to the client.
-   * @returns The best rates for USDT/ETB or an error message.
-   */
-  public getUSDTETBWithTeleBirrRates = async (req: Request, res: Response) => {
-    const paymentMethod = EthiopiaPaymentMethod.TeleBirr;
-    const rates = await this.getBestRatesFromDB(
-      FiatCurrency.ETB,
-      paymentMethod
-    );
-    if (rates) {
-      res.status(200).json(rates);
-    } else {
-      res.status(500).json({
-        error: `Failed to fetch USDT/ETB rates for ${paymentMethod}.`,
-      });
-    }
-  };
-
   private routes(): void {
-    this.router.get("/usdt-kes", this.getUSDTKESWithMpesaKenyaRates);
-    this.router.get("/usdt-etb/", this.getUSDTETBWithTeleBirrRates);
+    /**
+     *  Route to get best rates for any supported pair and payment method
+     *  @example: GET /rates/usdt/kes/mpesakenya
+     */
+    this.router.get(
+      "/usdt/:fiatCurrency/:paymentMethod",
+      asyncWrapper(this.getBestRatesForPair)
+    );
 
-    this.router.get("/:fiatCurrency", this.getRatesByCurrency);
+    /**
+     *  Route to get all rates for a specific fiat currency
+     *  @example: GET /rates/kes
+     */
+    this.router.get("/:fiatCurrency", asyncWrapper(this.getRatesByCurrency));
   }
 }
