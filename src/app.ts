@@ -7,7 +7,6 @@ import express, { Application, Request, Response } from "express";
 
 import routes from "@/routes";
 import { globalErrorHandler, notFoundHandler } from "@/middlewares/error";
-import cron from "./cron";
 
 const app: Application = express();
 dotenv.config();
@@ -17,10 +16,10 @@ app.set("trust proxy", true);
 
 app.use(
   cors({
-    origin: "http://payvo.com",
+    origin: ["http://payvo.com:30447", "http://localhost:3000"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "p2porization", "x-api-signature"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-signature"],
   })
 );
 
@@ -65,7 +64,5 @@ app.use("/api/v1/p2p", routes);
 
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
-
-cron;
 
 export default app;

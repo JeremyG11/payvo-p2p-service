@@ -2,9 +2,10 @@ import http from "http";
 import app from "@/app";
 import { config } from "@/config/env";
 import { logger } from "@/lib/logger";
+import { scheduleRateCleanup } from "@/services/cron";
 import { initRedis, shutdownRedis } from "@/config/radis";
 import kafkaInit, { disconnectKafka } from "@/config/kafka";
-import { getAppRolesPermissionsFromRedis } from "./lib/cache-utils";
+import { getAppRolesPermissionsFromRedis } from "@/lib/cache-utils";
 
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(config.port) || 5001;
@@ -31,6 +32,8 @@ async function startServer() {
   try {
     await bootstrap();
 
+    const ratesCron = scheduleRateCleanup();
+
     const server = http.createServer(app);
     server.listen(PORT, HOST, () => {
       logger.info(`🚀 Server listening at http://${HOST}:${PORT}`);
@@ -45,6 +48,10 @@ async function startServer() {
         if (err) logger.error("Error closing HTTP server:", err);
         else logger.info("HTTP server closed");
       });
+
+      // stop cron
+      ratesCron.stop();
+      logger.info("Cron job stopped");
 
       // Kafka & Redis cleanup
       await disconnectKafka();

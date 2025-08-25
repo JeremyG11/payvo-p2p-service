@@ -38,7 +38,7 @@ enum UgandaPaymentMethod {
   MoMoNew
 }
 
-enum PaymentMethodType {
+enum SupportedPaymentMethodType {
   MOBILE_MONEY
   BANK_ACCOUNT  
 }

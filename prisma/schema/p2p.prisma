@@ -1,7 +1,7 @@
 model SupportedPaymentMethod {
   id                      String               @id @default(uuid())
-  type                    PaymentMethodType
-  method                  String               
+  type                    SupportedPaymentMethodType
+  name                    String               
   currency                FiatCurrency
   isActive                Boolean              @default(true)
   logo                    String?
@@ -11,9 +11,9 @@ model SupportedPaymentMethod {
   userPaymentMethods      UserPaymentMethod[]
   rates                   FiatCryptoRate[]
 
-  @@unique([method, currency])
+  @@unique([name, currency])
   @@index([type])
-  @@index([method])
+  @@index([name])
   @@index([currency])
   @@index([isActive])
 }
@@ -43,6 +43,7 @@ model MPesaKenya {
   phoneNumber        String           @unique
   accountName        String?
   
+  displayName        String?          @default("M-Pesa Kenya")
   userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
 
   createdAt          DateTime         @default(now())
@@ -55,7 +56,8 @@ model Cbe {
   id                 String           @id @default(uuid())
   accountNumber      String           @unique
   accountName        String
-  
+  displayName        String?          @default("Commercial Bank of Ethiopia")
+
   userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
 
   createdAt          DateTime         @default(now())
@@ -68,7 +70,8 @@ model TeleBirr {
   id                 String           @id @default(uuid())
   phoneNumber        String           @unique
   accountName        String?
-  
+  displayName        String?          @default("Tele Birr")
+
   userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
 
   createdAt          DateTime         @default(now())

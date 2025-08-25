@@ -58,8 +58,8 @@ export class RateController {
       const supportedMethod =
         await this.prisma.supportedPaymentMethod.findUnique({
           where: {
-            method_currency: {
-              method: paymentMethodName,
+            name_currency: {
+              name: paymentMethodName,
               currency: fiatCurrency,
             },
           },
@@ -159,8 +159,6 @@ export class RateController {
       throw new BadRequestError(`Invalid currency: ${fiatCurrency}`);
     }
 
-    // Since paymentMethod is from req.params, it's a string, so we need to
-    // validate it against the union type.
     const allPaymentMethods = {
       ...KenyaPaymentMethod,
       ...EthiopiaPaymentMethod,

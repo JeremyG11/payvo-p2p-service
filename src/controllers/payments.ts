@@ -14,7 +14,7 @@ import {
   Prisma,
   PrismaClient,
   FiatCurrency,
-  PaymentMethodType,
+  SupportedPaymentMethodType,
   MPesaKenya,
   Cbe,
   TeleBirr,
@@ -51,8 +51,7 @@ type PaymentAccount = MPesaKenya | Cbe | TeleBirr;
  * The unified type for user payment method details, including the linked account.
  */
 type UserPaymentMethodDetails = UserPaymentMethod & {
-  supportedPaymentMethod: SupportedPaymentMethod;
-  mpesaKenya: MPesaKenya | null;
+  mpesaKenya: MPesaKenya;
   cbe: Cbe | null;
   telebirr: TeleBirr | null;
 };
@@ -103,7 +102,7 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: PaymentMethodType.MOBILE_MONEY,
+        type: SupportedPaymentMethodType.MOBILE_MONEY,
         currency: FiatCurrency.KES,
         isActive: true,
       },
@@ -191,7 +190,7 @@ class CBEHandler extends PaymentMethodHandler {
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: PaymentMethodType.BANK_ACCOUNT,
+        type: SupportedPaymentMethodType.BANK_ACCOUNT,
         currency: FiatCurrency.ETB,
         isActive: true,
       },
@@ -275,13 +274,21 @@ class CBEHandler extends PaymentMethodHandler {
  */
 class TeleBirrHandler extends PaymentMethodHandler {
   async addAccount(req: Request, userId: string): Promise<TeleBirr> {
-    const validatedData = AddTeleBirrSchema.parse(req.body);
-    const { phoneNumber } = validatedData;
+    console.log("Adding TeleBirr account with data:", req.body);
+    const validatedData = AddTeleBirrSchema.safeParse(req.body);
+
+    if (!validatedData.success) {
+      throw new BadRequestError(
+        validatedData.error.issues.map((issue) => issue.message).join(", ")
+      );
+    }
+    const { phoneNumber } = validatedData.data;
+
     const { isDefault = false } = req.body;
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: PaymentMethodType.MOBILE_MONEY,
+        type: SupportedPaymentMethodType.MOBILE_MONEY,
         currency: FiatCurrency.ETB,
         isActive: true,
       },
@@ -461,13 +468,13 @@ export class PaymentController {
       this.getUserId(req);
       const methods: Pick<
         SupportedPaymentMethod,
-        "id" | "type" | "method" | "currency"
+        "id" | "type" | "name" | "currency"
       >[] = await this.prisma.supportedPaymentMethod.findMany({
         where: { isActive: true },
         select: {
           id: true,
           type: true,
-          method: true,
+          name: true,
           currency: true,
         },
       });
@@ -534,6 +541,7 @@ export class PaymentController {
   ): Promise<void> {
     try {
       const userId = this.getUserId(req);
+
       const { fiatCurrency } = req.params;
       const currency = fiatCurrency.toUpperCase() as FiatCurrency;
 
@@ -564,6 +572,58 @@ export class PaymentController {
     }
   }
 
+  /**
+   * Retrieves all payment methods for a specific user.
+   * @param {Request} req The Express request object.
+   * @param {Response} res The Express response object.
+   */
+
+  async getPaymentMethodsByUser(req: Request, res: Response): Promise<void> {
+    try {
+      this.getUserId(req);
+
+      const { userId } = req.params;
+
+      if (!userId) {
+        throw new BadRequestError("User ID is required");
+      }
+
+      // Query for user payment methods and include the supported method type
+      const accounts = await this.prisma.userPaymentMethod.findMany({
+        where: { userId },
+        include: {
+          supportedPaymentMethod: true, 
+          mpesaKenya: true,
+          cbe: true,
+          telebirr: true,
+        },
+      });
+
+      const formattedAccounts = accounts.map((account) => {
+        return {
+          id: account.id,
+          userId: account.userId,
+          isDefault: account.isDefault,
+          createdAt: account.createdAt,
+          updatedAt: account.updatedAt,
+          paymentMethod: {
+            id: account.supportedPaymentMethod.id,
+            type: account.supportedPaymentMethod.type,
+            name: account.supportedPaymentMethod.name,
+            currency: account.supportedPaymentMethod.currency,
+          },
+        };
+      });
+
+      this.sendSuccess(
+        res,
+        formattedAccounts,
+        "User payment methods retrieved"
+      );
+    } catch (error) {
+      this.sendError(res, error, "getPaymentMethodsByUser");
+    }
+  }
   /**
    * Updates a specific payment method account.
    * @param {Request} req The Express request object.
@@ -666,7 +726,7 @@ export class PaymentController {
     const router = Router();
 
     router.get(
-      "/supported-methods",
+      "/",
       asyncWrapper(this.getAllSupportedPaymentMethods.bind(this))
     );
 
@@ -677,6 +737,11 @@ export class PaymentController {
     router.get(
       "/methods/:methodName",
       asyncWrapper(this.getPaymentMethods.bind(this))
+    );
+
+    router.get(
+      "/users/:userId/methods",
+      asyncWrapper(this.getPaymentMethodsByUser.bind(this))
     );
 
     router.get(

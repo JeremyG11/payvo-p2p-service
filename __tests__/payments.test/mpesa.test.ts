@@ -1,7 +1,7 @@
 import request from "supertest";
 import { describe, it, beforeEach, expect, vi } from "vitest";
 import {
-  PaymentMethodType,
+  SupportedPaymentMethodType,
   FiatCurrency,
   SupportedPaymentMethod,
   MPesaKenya,
@@ -25,8 +25,8 @@ declare global {
 const mockSupportedMethods: SupportedPaymentMethod[] = [
   {
     id: "sup-mpesa",
-    method: "M-Pesa",
-    type: PaymentMethodType.MOBILE_MONEY,
+    name: "M-Pesa",
+    type: SupportedPaymentMethodType.MOBILE_MONEY,
     currency: FiatCurrency.KES,
     isActive: true,
     logo: "url/mpesa.png",
@@ -35,8 +35,8 @@ const mockSupportedMethods: SupportedPaymentMethod[] = [
   },
   {
     id: "sup-cbe",
-    method: "Commercial Bank of Ethiopia",
-    type: PaymentMethodType.BANK_ACCOUNT,
+    name: "Commercial Bank of Ethiopia",
+    type: SupportedPaymentMethodType.BANK_ACCOUNT,
     currency: FiatCurrency.ETB,
     isActive: true,
     logo: "url/cbe.png",
@@ -45,8 +45,8 @@ const mockSupportedMethods: SupportedPaymentMethod[] = [
   },
   {
     id: "sup-telebirr",
-    method: "TeleBirr",
-    type: PaymentMethodType.MOBILE_MONEY,
+    name: "TeleBirr",
+    type: SupportedPaymentMethodType.MOBILE_MONEY,
     currency: FiatCurrency.ETB,
     isActive: true,
     logo: "url/telebirr.png",
@@ -100,19 +100,19 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   req.userId = "user123";
   next();
 });
-app.use("/payments", paymentController.routes());
+app.use("/payments/payment-methods", paymentController.routes());
 
 describe("PaymentController API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("GET /payments/supported-methods", () => {
+  describe("GET /payments/payment-methods", () => {
     it("should return 200 with all active supported methods", async () => {
       mockPrisma.supportedPaymentMethod.findMany.mockResolvedValue(
         mockSupportedMethods
       );
-      const response = await request(app).get("/payments/supported-methods");
+      const response = await request(app).get("/payments/payment-methods");
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(
@@ -130,7 +130,7 @@ describe("PaymentController API", () => {
       unauthApp.use("/payments", paymentController.routes());
 
       const response = await request(unauthApp).get(
-        "/payments/supported-methods"
+        "/payments/payment-methods"
       );
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);

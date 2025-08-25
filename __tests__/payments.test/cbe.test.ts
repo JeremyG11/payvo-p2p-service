@@ -1,6 +1,6 @@
 import request from "supertest";
 import { describe, it, beforeEach, expect, vi } from "vitest";
-import { PaymentMethodType, FiatCurrency } from "@prisma/client";
+import { SupportedPaymentMethodType, FiatCurrency } from "@prisma/client";
 import express, { Request, Application, Response, NextFunction } from "express";
 import { PaymentController } from "../../src/controllers/payments";
 
@@ -75,7 +75,7 @@ describe("PaymentController API — CBE endpoints", () => {
   it("should create a new CBE account", async () => {
     const mockSupportedMethod = {
       id: "sup-cbe",
-      type: PaymentMethodType.BANK_ACCOUNT,
+      type: SupportedPaymentMethodType.BANK_ACCOUNT,
       method: "Commercial Bank of Ethiopia",
       currency: FiatCurrency.ETB,
       isActive: true,
@@ -130,7 +130,7 @@ describe("PaymentController API — CBE endpoints", () => {
     // Mock the supported payment method lookup
     mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue({
       id: "sup-cbe",
-      type: PaymentMethodType.BANK_ACCOUNT,
+      type: SupportedPaymentMethodType.BANK_ACCOUNT,
       method: "Commercial Bank of Ethiopia",
       currency: FiatCurrency.ETB,
       isActive: true,
