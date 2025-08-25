@@ -117,7 +117,9 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
     });
 
     if (existingAccount) {
-      throw new BadRequestError("This phone number is already registered");
+      throw new BadRequestError(
+        `This ${existingAccount.displayName} account is already registered`
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -164,7 +166,9 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
     });
 
     if (existingAccount && existingAccount.id !== accountId) {
-      throw new BadRequestError("This phone number is already registered");
+      throw new BadRequestError(
+        `This ${existingAccount.displayName} account is already registered`
+      );
     }
 
     return this.prisma.mPesaKenya.update({
@@ -274,7 +278,6 @@ class CBEHandler extends PaymentMethodHandler {
  */
 class TeleBirrHandler extends PaymentMethodHandler {
   async addAccount(req: Request, userId: string): Promise<TeleBirr> {
-    console.log("Adding TeleBirr account with data:", req.body);
     const validatedData = AddTeleBirrSchema.safeParse(req.body);
 
     if (!validatedData.success) {
@@ -303,7 +306,9 @@ class TeleBirrHandler extends PaymentMethodHandler {
     });
 
     if (existingAccount) {
-      throw new BadRequestError("This phone number is already registered");
+      throw new BadRequestError(
+        `This ${existingAccount.displayName} account is already registered`
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -350,7 +355,9 @@ class TeleBirrHandler extends PaymentMethodHandler {
         where: { phoneNumber },
       });
       if (existingAccount && existingAccount.id !== accountId) {
-        throw new BadRequestError("This phone number is already registered");
+        throw new BadRequestError(
+          `This ${existingAccount.displayName} account is already registered`
+        );
       }
       updateData.phoneNumber = phoneNumber;
     }
@@ -379,7 +386,7 @@ export class PaymentController {
   constructor(prismaClient: PrismaClient) {
     this.prisma = prismaClient;
     this.handlers = new Map();
-    this.handlers.set("mpesa-kenya", new MPesaKenyaHandler(prismaClient));
+    this.handlers.set("mpesakenya", new MPesaKenyaHandler(prismaClient));
     this.handlers.set("cbe", new CBEHandler(prismaClient));
     this.handlers.set("telebirr", new TeleBirrHandler(prismaClient));
   }
@@ -405,6 +412,7 @@ export class PaymentController {
    * @throws {BadRequestError} If the payment method is not supported.
    */
   private getHandler(methodName: string): PaymentMethodHandler {
+    console.log("Retrieving handler for method:", methodName);
     const handler = this.handlers.get(methodName);
     if (!handler) {
       throw new BadRequestError(`Unsupported payment method: ${methodName}`);
@@ -592,14 +600,18 @@ export class PaymentController {
       const accounts = await this.prisma.userPaymentMethod.findMany({
         where: { userId },
         include: {
-          supportedPaymentMethod: true, 
+          supportedPaymentMethod: true, // Include the general payment method details
           mpesaKenya: true,
           cbe: true,
           telebirr: true,
         },
       });
 
+      // Map the results to the desired structure
       const formattedAccounts = accounts.map((account) => {
+        const userSpecificDetails =
+          account.telebirr || account.cbe || account.mpesaKenya;
+
         return {
           id: account.id,
           userId: account.userId,
@@ -611,6 +623,9 @@ export class PaymentController {
             type: account.supportedPaymentMethod.type,
             name: account.supportedPaymentMethod.name,
             currency: account.supportedPaymentMethod.currency,
+            details: {
+              displayName: userSpecificDetails.displayName,
+            },
           },
         };
       });
@@ -653,7 +668,7 @@ export class PaymentController {
       await this.prisma.$transaction(async (tx) => {
         if (Object.keys(details).length > 0) {
           if (paymentMethod.mpesaKenya) {
-            await this.getHandler("mpesa-kenya").updateAccount(
+            await this.getHandler("mpesakenya").updateAccount(
               paymentMethodId,
               details as Partial<MPesaKenya>
             );

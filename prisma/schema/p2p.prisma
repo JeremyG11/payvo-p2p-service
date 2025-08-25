@@ -20,7 +20,7 @@ model SupportedPaymentMethod {
 
 model UserPaymentMethod {
   id                        String           @id @default(uuid())
-  userId                    String            
+  userId                    String           
   supportedPaymentMethodId  String
   isDefault                 Boolean          @default(false)
   userSpecificDetails       Json?            
@@ -34,7 +34,6 @@ model UserPaymentMethod {
 
   supportedPaymentMethod  SupportedPaymentMethod @relation(fields: [supportedPaymentMethodId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, supportedPaymentMethodId])
   @@index([userId])
 }
 
