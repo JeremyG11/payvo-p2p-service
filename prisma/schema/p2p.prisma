@@ -1,10 +1,12 @@
 model SupportedPaymentMethod {
   id                      String               @id @default(uuid())
   type                    SupportedPaymentMethodType
-  name                    String               
+  name                    String
+  displayName             String               
   currency                FiatCurrency
   isActive                Boolean              @default(true)
   logo                    String?
+ 
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
 
@@ -41,7 +43,7 @@ model MPesaKenya {
   id                 String           @id @default(uuid())
   phoneNumber        String           @unique
   accountName        String?
-  
+  currency           FiatCurrency     @default(KES)
   displayName        String?          @default("M-Pesa Kenya")
   userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
 
@@ -56,6 +58,7 @@ model Cbe {
   accountNumber      String           @unique
   accountName        String
   displayName        String?          @default("Commercial Bank of Ethiopia")
+  currency           FiatCurrency     @default(ETB)
 
   userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
 
@@ -69,6 +72,7 @@ model TeleBirr {
   id                 String           @id @default(uuid())
   phoneNumber        String           @unique
   accountName        String?
+  currency           FiatCurrency     @default(ETB)
   displayName        String?          @default("Tele Birr")
 
   userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)

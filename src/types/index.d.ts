@@ -5,12 +5,7 @@ import {
   UnitedStatesPaymentMethod,
 } from "@prisma/client";
 
-export type TPaymentMethod =
-  | UnitedStatesPaymentMethod
-  | EthiopiaPaymentMethod
-  | KenyaPaymentMethod
-  | UgandaPaymentMethod;
-
+ 
 export interface BasePaymentAccount {
   id: string;
   userId: string;

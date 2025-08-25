@@ -8,6 +8,9 @@ import {
   CryptoCurrency,
   UnitedStatesPaymentMethod,
   SupportedPaymentMethodType,
+  MPesaKenya,
+  TeleBirr,
+  Cbe,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -30,16 +33,29 @@ async function seedSupportedPaymentMethods(
   paymentMethods: string[],
   type: SupportedPaymentMethodType
 ) {
-  const data = paymentMethods.map((name) => ({
+  /**
+   * Map of payment method names to their display names.
+   * Add entries here as you add more payment methods.
+   * @example
+   * { "MPesaKenya": "M-Pesa Kenya", "TeleBirr": "TeleBirr", "Cbe": "Commercial Bank of Ethiopia" }
+   */
+  const paymentMethodDisplayNames: Record<string, string> = {
+    MPesaKenya: "M-Pesa Kenya",
+    TeleBirr: "TeleBirr",
+    Cbe: "Commercial Bank of Ethiopia",
+  };
+
+  const supportedPaymentMethodData = paymentMethods.map((name) => ({
     name: name,
     type: type,
     currency: fiatCurrency,
     isActive: true,
+    displayName: paymentMethodDisplayNames[name] || name,
   }));
 
   try {
     const result = await prisma.supportedPaymentMethod.createMany({
-      data,
+      data: supportedPaymentMethodData,
       skipDuplicates: true,
     });
     console.log(
@@ -124,7 +140,6 @@ async function storeBinanceRates(
       fiatCurrency: fiatCurrency,
       cryptoCurrency: CryptoCurrency.USDT,
       rateType: rateType,
-      // Use the ID from the fetched supported method
       paymentMethodId: paymentMethodId,
       rawRate: String(ad.rawRate),
       adjustedRate: String(adjustedRate),
@@ -193,7 +208,7 @@ export async function fetchAndStoreBinanceFiatRates(
           method as TSupportedPaymentMethod,
           RateType.BUY,
           buyAds,
-          idMap 
+          idMap
         );
       } catch (error) {
         console.error(

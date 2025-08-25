@@ -476,7 +476,7 @@ export class PaymentController {
       this.getUserId(req);
       const methods: Pick<
         SupportedPaymentMethod,
-        "id" | "type" | "name" | "currency"
+        "id" | "type" | "name" | "currency" | "displayName"
       >[] = await this.prisma.supportedPaymentMethod.findMany({
         where: { isActive: true },
         select: {
@@ -484,8 +484,10 @@ export class PaymentController {
           type: true,
           name: true,
           currency: true,
+          displayName: true,
         },
       });
+
       this.sendSuccess(
         res,
         methods,
