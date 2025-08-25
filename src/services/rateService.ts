@@ -7,16 +7,12 @@ import {
   EthiopiaPaymentMethod,
   CryptoCurrency,
   UnitedStatesPaymentMethod,
-  SupportedPaymentMethodType,
-  MPesaKenya,
-  TeleBirr,
-  Cbe,
+  PaymentMethodType,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getBinanceRates } from "../utils/rateFetcher";
 import { Decimal } from "@prisma/client/runtime/library";
-import { TSupportedPaymentMethod } from "@/controllers/rates";
 
 const DEFAULT_MARGIN_PERCENTAGE = new Decimal(2.5);
 const RATE_EXPIRY_MINUTES = 5;
@@ -30,36 +26,42 @@ const RATE_EXPIRY_MINUTES = 5;
  */
 async function seedSupportedPaymentMethods(
   fiatCurrency: FiatCurrency,
-  paymentMethods: string[],
-  type: SupportedPaymentMethodType
+  paymentMethods: {
+    name: string;
+    displayName: string;
+    type: PaymentMethodType;
+  }[]
 ) {
-  /**
-   * Map of payment method names to their display names.
-   * Add entries here as you add more payment methods.
-   * @example
-   * { "MPesaKenya": "M-Pesa Kenya", "TeleBirr": "TeleBirr", "Cbe": "Commercial Bank of Ethiopia" }
-   */
-  const paymentMethodDisplayNames: Record<string, string> = {
-    MPesaKenya: "M-Pesa Kenya",
-    TeleBirr: "TeleBirr",
-    Cbe: "Commercial Bank of Ethiopia",
-  };
-
-  const supportedPaymentMethodData = paymentMethods.map((name) => ({
-    name: name,
-    type: type,
-    currency: fiatCurrency,
-    isActive: true,
-    displayName: paymentMethodDisplayNames[name] || name,
-  }));
+  console.log(
+    `Seeding supported payment methods for ${fiatCurrency}:`,
+    paymentMethods
+  );
 
   try {
-    const result = await prisma.supportedPaymentMethod.createMany({
-      data: supportedPaymentMethodData,
-      skipDuplicates: true,
-    });
+    for (const method of paymentMethods) {
+      await prisma.supportedPaymentMethod.upsert({
+        where: {
+          name_currency: {
+            name: method.name,
+            currency: fiatCurrency,
+          },
+        },
+        update: {
+          displayName: method.displayName,
+          type: method.type,
+          isActive: true,
+        },
+        create: {
+          name: method.name,
+          type: method.type,
+          currency: fiatCurrency,
+          isActive: true,
+          displayName: method.displayName,
+        },
+      });
+    }
     console.log(
-      `Seeded ${result.count} supported payment methods for ${fiatCurrency}.`
+      `Successfully upserted ${paymentMethods.length} payment methods for ${fiatCurrency}.`
     );
   } catch (error) {
     console.error(
@@ -103,7 +105,7 @@ async function getPaymentMethodIdMap(fiatCurrency: FiatCurrency) {
  */
 async function storeBinanceRates(
   fiatCurrency: FiatCurrency,
-  paymentMethod: TSupportedPaymentMethod,
+  paymentMethod: string,
   rateType: RateType,
   ads: any[],
   idMap: Record<string, string>
@@ -177,13 +179,16 @@ async function storeBinanceRates(
  */
 export async function fetchAndStoreBinanceFiatRates(
   fiatCurrency: FiatCurrency,
-  paymentMethods: string[],
-  paymentType: SupportedPaymentMethodType
+  paymentMethods: {
+    name: string;
+    displayName: string;
+    type: PaymentMethodType;
+  }[]
 ) {
   /**
    * Seed the supported payment methods first.
    */
-  await seedSupportedPaymentMethods(fiatCurrency, paymentMethods, paymentType);
+  await seedSupportedPaymentMethods(fiatCurrency, paymentMethods);
 
   /**
    * Fetch all payment method IDs once after seeding
@@ -199,13 +204,13 @@ export async function fetchAndStoreBinanceFiatRates(
       try {
         const buyAds = await getBinanceRates(
           fiatCurrency,
-          [method as string],
+          [method.name],
           RateType.BUY,
           3
         );
         await storeBinanceRates(
           fiatCurrency,
-          method as TSupportedPaymentMethod,
+          method.name,
           RateType.BUY,
           buyAds,
           idMap
@@ -223,13 +228,13 @@ export async function fetchAndStoreBinanceFiatRates(
       try {
         const sellAds = await getBinanceRates(
           fiatCurrency,
-          [method as string],
+          [method.name],
           RateType.SELL,
           3
         );
         await storeBinanceRates(
           fiatCurrency,
-          method as TSupportedPaymentMethod,
+          method.name,
           RateType.SELL,
           sellAds,
           idMap
@@ -255,23 +260,55 @@ export async function fetchAndStoreAllBinanceRates() {
     await Promise.all([
       fetchAndStoreBinanceFiatRates(
         FiatCurrency.USD,
-        Object.values(UnitedStatesPaymentMethod),
-        SupportedPaymentMethodType.BANK_ACCOUNT
+        Object.values(UnitedStatesPaymentMethod).map((name) => ({
+          name,
+          displayName: name === "BANK" ? "Bank" : "Cash",
+          type:
+            name === "BANK"
+              ? PaymentMethodType.BANK_ACCOUNT
+              : PaymentMethodType.CASH,
+        }))
       ),
       fetchAndStoreBinanceFiatRates(
         FiatCurrency.KES,
-        Object.values(KenyaPaymentMethod),
-        SupportedPaymentMethodType.BANK_ACCOUNT
+        Object.values(KenyaPaymentMethod).map((name) => ({
+          name,
+          displayName: name === "MPesaKenya" ? "M-Pesa Kenya" : "Bank",
+          type:
+            name === "MPesaKenya"
+              ? PaymentMethodType.MOBILE_MONEY
+              : PaymentMethodType.BANK_ACCOUNT,
+        }))
       ),
       fetchAndStoreBinanceFiatRates(
         FiatCurrency.ETB,
-        Object.values(EthiopiaPaymentMethod),
-        SupportedPaymentMethodType.BANK_ACCOUNT
+        Object.values(EthiopiaPaymentMethod).map((name) => {
+          let type: PaymentMethodType;
+          if (name === "TeleBirr") {
+            type = PaymentMethodType.MOBILE_MONEY;
+          } else if (name === "CBE" || name === "Cbe") {
+            type = PaymentMethodType.BANK_ACCOUNT;
+          } else {
+            type = PaymentMethodType.BANK_ACCOUNT;
+          }
+          return {
+            name,
+            displayName:
+              name === "TeleBirr" ? "Tele Birr" : "Commercial Bank of Ethiopia",
+            type,
+          };
+        })
       ),
       fetchAndStoreBinanceFiatRates(
         FiatCurrency.UGX,
-        Object.values(UgandaPaymentMethod),
-        SupportedPaymentMethodType.BANK_ACCOUNT
+        Object.values(UgandaPaymentMethod).map((name) => ({
+          name,
+          displayName: name === "MoMoNew" ? "MTN MoMo Uganda" : "Bank",
+          type:
+            name === "MoMoNew"
+              ? PaymentMethodType.MOBILE_MONEY
+              : PaymentMethodType.BANK_ACCOUNT,
+        }))
       ),
     ]);
     console.log("All Binance rates successfully fetched and stored.");

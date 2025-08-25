@@ -14,7 +14,7 @@ import {
   Prisma,
   PrismaClient,
   FiatCurrency,
-  SupportedPaymentMethodType,
+  PaymentMethodType,
   MPesaKenya,
   Cbe,
   TeleBirr,
@@ -102,7 +102,7 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: SupportedPaymentMethodType.MOBILE_MONEY,
+        type: PaymentMethodType.MOBILE_MONEY,
         currency: FiatCurrency.KES,
         isActive: true,
       },
@@ -194,7 +194,7 @@ class CBEHandler extends PaymentMethodHandler {
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: SupportedPaymentMethodType.BANK_ACCOUNT,
+        type: PaymentMethodType.BANK_ACCOUNT,
         currency: FiatCurrency.ETB,
         isActive: true,
       },
@@ -291,7 +291,7 @@ class TeleBirrHandler extends PaymentMethodHandler {
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: SupportedPaymentMethodType.MOBILE_MONEY,
+        type: PaymentMethodType.MOBILE_MONEY,
         currency: FiatCurrency.ETB,
         isActive: true,
       },
@@ -412,8 +412,7 @@ export class PaymentController {
    * @throws {BadRequestError} If the payment method is not supported.
    */
   private getHandler(methodName: string): PaymentMethodHandler {
-    console.log("Retrieving handler for method:", methodName);
-    const handler = this.handlers.get(methodName);
+    const handler = this.handlers.get(methodName.toLowerCase());
     if (!handler) {
       throw new BadRequestError(`Unsupported payment method: ${methodName}`);
     }

@@ -1,6 +1,6 @@
 model SupportedPaymentMethod {
   id                      String               @id @default(uuid())
-  type                    SupportedPaymentMethodType
+  type                    PaymentMethodType
   name                    String
   displayName             String               
   currency                FiatCurrency
@@ -40,16 +40,16 @@ model UserPaymentMethod {
 }
 
 model MPesaKenya {
-  id                 String           @id @default(uuid())
-  phoneNumber        String           @unique
+  id                 String             @id @default(uuid())
+  phoneNumber        String             @unique
   accountName        String?
-  currency           FiatCurrency     @default(KES)
-  displayName        String?          @default("M-Pesa Kenya")
-  userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
+  currency           FiatCurrency       @default(KES)
+  displayName        String?            @default("M-Pesa Kenya")
+  userPaymentMethod  UserPaymentMethod  @relation(fields: [id], references: [id], onDelete: Cascade)
 
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
   @@map("mpesa_kenya")
 }
 
