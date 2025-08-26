@@ -130,6 +130,9 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
           userId,
           supportedPaymentMethodId: supportedMethod.id,
           isDefault,
+          userSpecificDetails: {
+            phoneNumber,
+          },
         },
       });
 
@@ -220,6 +223,10 @@ class CBEHandler extends PaymentMethodHandler {
           userId,
           supportedPaymentMethodId: supportedMethod.id,
           isDefault,
+          userSpecificDetails: {
+            accountName,
+            accountNumber,
+          },
         },
       });
 
@@ -319,6 +326,9 @@ class TeleBirrHandler extends PaymentMethodHandler {
           userId,
           supportedPaymentMethodId: supportedMethod.id,
           isDefault,
+          userSpecificDetails: {
+            phoneNumber,
+          },
         },
       });
 
@@ -601,7 +611,7 @@ export class PaymentController {
       const accounts = await this.prisma.userPaymentMethod.findMany({
         where: { userId },
         include: {
-          supportedPaymentMethod: true, // Include the general payment method details
+          supportedPaymentMethod: true,
           mpesaKenya: true,
           cbe: true,
           telebirr: true,
@@ -625,7 +635,7 @@ export class PaymentController {
             name: account.supportedPaymentMethod.name,
             currency: account.supportedPaymentMethod.currency,
             details: {
-              displayName: userSpecificDetails.displayName,
+              ...userSpecificDetails,
             },
           },
         };
