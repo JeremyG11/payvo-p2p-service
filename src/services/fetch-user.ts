@@ -44,6 +44,7 @@ export const fetchUserById = async (
   email: string;
   avatar?: string;
 }> => {
+  
   const url = `${config.servicesURLs.auth}/users/${userId}`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

@@ -6,14 +6,21 @@ import { scheduleRateCleanup } from "@/services/cron";
 import { initRedis, shutdownRedis } from "@/config/radis";
 import kafkaInit, { disconnectKafka } from "@/config/kafka";
 import { getAppRolesPermissionsFromRedis } from "@/lib/cache-utils";
+import { InternalServerError } from "@/lib/error";
 
 const HOST = process.env.HOST || "0.0.0.0";
-const PORT = Number(config.port) || 5001;
+const PORT = Number(config.port) || 5006;
 
 async function bootstrap() {
   try {
     if (!config.jwtPublicKey) {
-      throw new Error("JWT keys must be defined in environment.");
+      throw new InternalServerError("JWT keys must be defined in environment.");
+    }
+
+    if (!config.commissionPercent || isNaN(Number(config.commissionPercent))) {
+      throw new InternalServerError(
+        "Commission percent must be defined and a number."
+      );
     }
 
     await kafkaInit();

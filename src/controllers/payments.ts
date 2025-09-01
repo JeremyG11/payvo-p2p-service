@@ -14,12 +14,12 @@ import {
   Prisma,
   PrismaClient,
   FiatCurrency,
-  PaymentMethodType,
   MPesaKenya,
   Cbe,
   TeleBirr,
   UserPaymentMethod,
   SupportedPaymentMethod,
+  PaymentMethodCategory,
 } from "@prisma/client";
 
 import { Router, Request, Response } from "express";
@@ -102,7 +102,7 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: PaymentMethodType.MOBILE_MONEY,
+        category: PaymentMethodCategory.MOBILE_MONEY,
         currency: FiatCurrency.KES,
         isActive: true,
       },
@@ -130,7 +130,7 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
           userId,
           supportedPaymentMethodId: supportedMethod.id,
           isDefault,
-          userSpecificDetails: {
+          details: {
             phoneNumber,
           },
         },
@@ -197,7 +197,7 @@ class CBEHandler extends PaymentMethodHandler {
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: PaymentMethodType.BANK_ACCOUNT,
+        category: PaymentMethodCategory.BANK_TRANSFER,
         currency: FiatCurrency.ETB,
         isActive: true,
       },
@@ -223,7 +223,7 @@ class CBEHandler extends PaymentMethodHandler {
           userId,
           supportedPaymentMethodId: supportedMethod.id,
           isDefault,
-          userSpecificDetails: {
+          details: {
             accountName,
             accountNumber,
           },
@@ -298,7 +298,7 @@ class TeleBirrHandler extends PaymentMethodHandler {
 
     const supportedMethod = await this.prisma.supportedPaymentMethod.findFirst({
       where: {
-        type: PaymentMethodType.MOBILE_MONEY,
+        category: PaymentMethodCategory.MOBILE_MONEY,
         currency: FiatCurrency.ETB,
         isActive: true,
       },
@@ -326,7 +326,7 @@ class TeleBirrHandler extends PaymentMethodHandler {
           userId,
           supportedPaymentMethodId: supportedMethod.id,
           isDefault,
-          userSpecificDetails: {
+          details: {
             phoneNumber,
           },
         },
@@ -485,13 +485,11 @@ export class PaymentController {
       this.getUserId(req);
       const methods: Pick<
         SupportedPaymentMethod,
-        "id" | "type" | "name" | "currency" | "displayName"
+        "id" | "currency" | "displayName"
       >[] = await this.prisma.supportedPaymentMethod.findMany({
         where: { isActive: true },
         select: {
           id: true,
-          type: true,
-          name: true,
           currency: true,
           displayName: true,
         },
@@ -631,8 +629,8 @@ export class PaymentController {
           updatedAt: account.updatedAt,
           paymentMethod: {
             id: account.supportedPaymentMethod.id,
-            type: account.supportedPaymentMethod.type,
-            name: account.supportedPaymentMethod.name,
+            type: account.supportedPaymentMethod.category,
+            name: account.supportedPaymentMethod.category,
             currency: account.supportedPaymentMethod.currency,
             details: {
               ...userSpecificDetails,

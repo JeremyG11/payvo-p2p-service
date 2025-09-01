@@ -3,6 +3,39 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"  
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+
+
+model Customer {
+  id              String   @id @default(uuid())
+
+  userId          String   @unique
+  totalOrders     Int      @default(0)
+  completedOrders Int      @default(0)
+  rating          Decimal  @db.Decimal(3, 2) @default(0.0)
+
+
+  orders          Order[]
+  disputes        Dispute[] @relation("CustomerDisputes")
+
+  @@index([userId])
+}
+
+model Agent {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  totalOrders        Int      @default(0)
+  completedOrders    Int      @default(0)
+  commissionRate     Decimal  @db.Decimal(5, 2) @default(0.0)
+  rating             Decimal  @db.Decimal(3, 2) @default(0.0)
+
+
+  ads               Ad[]
+  orders            Order[]
+  disputes          Dispute[] @relation("AgentDisputes")
+
+  @@index([userId])
 }

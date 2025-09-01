@@ -1,6 +1,6 @@
 import cron, { ScheduledTask } from "node-cron";
 import { prisma } from "@/lib/prisma";
-import { fetchAndStoreAllBinanceRates } from "./rateService";
+import { fetchAndStoreAllBinanceRates } from "./rates";
 
 cron.schedule("*/2 * * * *", async () => {
   console.log(

@@ -1,11 +1,11 @@
-import "module-alias/register";
-import { logger } from "@/lib/logger";
-import { verifyJwt } from "@/lib/jwt";
-import { CachedAuthData } from "@/types";
-import { UserCacheFields } from "@/lib/cache-keys";
-import { Request, Response, NextFunction } from "express";
-import { fetchUserPermissions } from "@/services/fetch-user";
-import { blacklistService, userCacheService } from "@/services/cache";
+import 'module-alias/register';
+import { logger } from '@/lib/logger';
+import { verifyJwt } from '@/lib/jwt';
+import { CachedAuthData } from '@/types';
+import { UserCacheFields } from '@/lib/cache-keys';
+import { Request, Response, NextFunction } from 'express';
+import { blacklistService, userCacheService } from '@/services/cache';
+import { fetchUserPermissions } from '@/services/fetch-user';
 
 export const authenticate = async (
   req: Request,
@@ -15,23 +15,23 @@ export const authenticate = async (
   try {
     const accessToken =
       req.cookies?.accessToken ||
-      req.headers.authorization?.replace(/^Bearer\s/, "");
+      req.headers.authorization?.replace(/^Bearer\s/, '');
 
     if (!accessToken) {
       res.status(401).json({
-        code: "AuthenticationError",
-        message: "Access token is missing or invalid.",
+        code: 'AuthenticationError',
+        message: 'Access token is missing or invalid.',
       });
       return;
     }
 
     const { decoded, valid, expired } = verifyJwt(accessToken);
 
-    if (!valid || !decoded || typeof decoded.userId !== "string") {
+    if (!valid || !decoded || typeof decoded.userId !== 'string') {
       logger.error(`Invalid JWT payload: ${JSON.stringify(decoded)}`);
       res.status(401).json({
-        code: "AuthenticationError",
-        message: expired ? "Token expired" : "Invalid token",
+        code: 'AuthenticationError',
+        message: expired ? 'Token expired' : 'Invalid token',
       });
       return;
     }
@@ -39,8 +39,8 @@ export const authenticate = async (
     if (await blacklistService.isTokenBlacklisted(decoded.userId)) {
       logger.warn(`Access denied for blacklisted user: ${decoded.userId}`);
       res.status(403).json({
-        code: "UserBlacklisted",
-        message: "User account is suspended.",
+        code: 'UserBlacklisted',
+        message: 'User account is suspended.',
       });
       return;
     }
@@ -54,8 +54,8 @@ export const authenticate = async (
         `Access denied for blacklisted session (jti): ${decoded.jti}`
       );
       res.status(401).json({
-        code: "TokenRevoked",
-        message: "Token has been revoked.",
+        code: 'TokenRevoked',
+        message: 'Token has been revoked.',
       });
       return;
     }
@@ -84,8 +84,8 @@ export const authenticate = async (
           err
         );
         res.status(503).json({
-          code: "ServiceUnavailable",
-          message: "Unable to retrieve permissions.",
+          code: 'ServiceUnavailable',
+          message: 'Unable to retrieve permissions.',
         });
         return;
       }
@@ -97,8 +97,8 @@ export const authenticate = async (
       !Array.isArray(authData.permissions)
     ) {
       res.status(403).json({
-        code: "Forbidden",
-        message: "User has no valid permissions.",
+        code: 'Forbidden',
+        message: 'User has no valid permissions.',
       });
       return;
     }
@@ -108,10 +108,10 @@ export const authenticate = async (
 
     next();
   } catch (error) {
-    logger.error("Unexpected error in authentication middleware:", error);
+    logger.error('Unexpected error in authentication middleware:', error);
     res.status(500).json({
-      code: "ServerError",
-      message: "Internal server error",
+      code: 'ServerError',
+      message: 'Internal server error',
     });
   }
 };

@@ -78,7 +78,7 @@ export class BadRequestError extends AppError {
 }
 
 export class UnauthenticatedError extends AppError {
-  constructor(message:string = "Unauthenticated request") {
+  constructor(message: string = "Unauthenticated request") {
     super(message, 401, "Unauthenticated");
   }
 }
@@ -151,3 +151,15 @@ export class ServiceUnavailableError extends AppError {
     super(message, 503, "InternalServerError", false);
   }
 }
+
+export const errorStatusMap = {
+  [UnauthenticatedError.name]: 401,
+  [ForbiddenError.name]: 403,
+  [UnauthorizedError.name]: 403,
+  [BadRequestError.name]: 400,
+  [NotFoundError.name]: 404,
+  [TooManyRequestsError.name]: 429,
+  [ConflictError.name]: 429,
+  [InternalServerError.name]: 500,
+  [ServiceUnavailableError.name]: 503,
+};

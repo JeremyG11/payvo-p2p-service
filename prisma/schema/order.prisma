@@ -1,0 +1,28 @@
+model Order {
+  id                      String    @id @default(uuid())
+  orderNumber             String    
+  customerId              String
+  agentId                 String
+  adId                    String
+  paymentMethodId         String
+
+  fiatAmount              Decimal   @db.Decimal(18, 2)
+  cryptoAmount            Decimal   @db.Decimal(36, 18)
+  unitPrice               Decimal   @db.Decimal(18, 8)
+  status                  OrderStatus @default(PENDING_AGENT_CONFIRMATION)
+  statusHistory           Json[]
+
+  expiresAt               DateTime?
+  completedAt             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  customer                Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  agent                   Agent             @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  ad                      Ad                @relation(fields: [adId], references: [id], onDelete: Restrict)
+  paymentMethod           UserPaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict, map: "Order_paymentMethodId_fkey", name: "ordersAsPaymentMethod")
+  dispute                 Dispute?
+
+  @@index([customerId, status])
+  @@index([agentId, status])
+}

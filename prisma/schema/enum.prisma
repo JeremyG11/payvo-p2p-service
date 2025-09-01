@@ -1,3 +1,21 @@
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  AGENT
+  USER
+}
+
+enum UserKycStatus {
+  PENDING      
+  INCOMPLETE
+  UNDER_REVIEW     
+  APPROVED
+  REJECTED
+  NEEDS_MORE_INFO  
+  EXPIRED     
+}
+
 enum Source {
   BINANCE
   OKX
@@ -38,10 +56,43 @@ enum UgandaPaymentMethod {
   MoMoNew
 }
 
-enum PaymentMethodType {
+enum PaymentMethodCategory {
   MOBILE_MONEY
-  BANK_ACCOUNT  
-  CASH
+  BANK_TRANSFER
+  CASH 
 }
 
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum PaymentMethodProvider {
+  MPESA_KENYA
+  CBE
+  TELE_BIRR
+  BANK
+  MTN_MOMO_UGANDA
+  CASH
+} 
  
+
+enum OrderStatus {
+  PENDING_AGENT_CONFIRMATION
+  AGENT_ACCEPTED
+  AGENT_REJECTED
+  PROCESSING 
+  COMPLETED
+  CANCELLED
+  EXPIRED
+  DISPUTED
+}
+ 
+enum AdStatus {
+  ACTIVE
+  PAUSED
+  EXPIRED
+  DELETED
+}

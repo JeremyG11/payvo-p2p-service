@@ -29,8 +29,9 @@ export const config = {
   // mail
   domain: process.env.FRONTEND_DOMAIN_URL!,
 
+  commissionPercent: process.env.COMMISSION_PERCENT!,
   servicesURLs: {
     auth: process.env.AUTH_SERVICE_URL!,
     p2p: process.env.P2P_SERVICE_URL!,
   },
-};
+} as const;
