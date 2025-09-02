@@ -8,7 +8,7 @@ import { blacklistService } from '@/services/cache/blacklist-cache';
 import { scheduleRateCleanup } from '@/services/cron';
 
 const HOST = process.env.HOST || '0.0.0.0';
-const PORT = Number(config.port) || 5001;
+const PORT = Number(config.port) || 5006;
 
 async function bootstrap() {
   if (!config.jwtPublicKey) {
