@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { initRedis, shutdownRedis } from '@/config/radis';
 import kafkaInit, { disconnectKafka } from '@/config/kafka';
 import { blacklistService } from '@/services/cache/blacklist-cache';
-import { scheduleRateCleanup } from './services/cron';
+import { scheduleRateCleanup } from '@/services/cron';
 
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = Number(config.port) || 5001;
