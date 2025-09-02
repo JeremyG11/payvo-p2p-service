@@ -1,6 +1,6 @@
-import { AppError } from "@/lib/error";
-import { config } from "@/config/env";
-import { getAuthContext } from "@/lib/utils/helpers";
+import { AppError } from '@/lib/error';
+import { config } from '@/config/env';
+import { getAuthContext } from '@/lib/utils/helpers';
 
 export const fetchAgents = async (
   token: string,
@@ -16,7 +16,7 @@ export const fetchAgents = async (
 }> => {
   const url = `${config.servicesURLs.auth}/users/agents`;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   };
 
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -39,17 +39,17 @@ export const fetchAgents = async (
 
     return resp.json();
   } catch (error) {
-    throw new AppError("Failed to fetch agents", 503);
+    throw new AppError('Failed to fetch agents', 503);
   }
 };
 
 export const fetchAgentById = async (
-  agentId: string,
+  userId: string,
   token: string
 ): Promise<any> => {
-  const url = `${config.servicesURLs.auth}/agents/${agentId}`;
+  const url = `${config.servicesURLs.auth}/agents/${userId}`;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   };
 
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -61,6 +61,6 @@ export const fetchAgentById = async (
     }
     return resp.json();
   } catch (error) {
-    throw new AppError("Failed to fetch agent by ID", 503);
+    throw new AppError('Failed to fetch agent by ID', 503);
   }
 };

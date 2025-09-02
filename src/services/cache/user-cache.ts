@@ -1,51 +1,32 @@
-import {
-  RedisModules,
-  RedisScripts,
-  RedisFunctions,
-  RedisClientType,
-} from "redis";
-import { logger } from "@/lib/logger";
-import { CacheServiceOptions } from ".";
-import { getRedis } from "@/config/radis";
-import { UserCacheFields, userCacheHashKey } from "@/lib/cache-keys";
+import { logger } from '@/lib/logger';
+import { config } from '@/config/env';
+import { HashCacheService } from '@payvo/redis';
+import { UserCacheFields, userCacheHashKey } from '@/lib/cache-keys';
+
+interface UserCacheServiceOptions {
+  defaultTtl?: number;
+  logger?: any;
+}
 
 /**
- * A robust Redis-backed caching service for app- and user-scoped data.
+ * A robust Redis-backed caching service for user-scoped data.
  * Uses Redis Hashes under the hood, with configurable TTL per key.
  */
 export class UserCacheService {
+  private hashCache: HashCacheService;
   private defaultTtl: number;
 
-  /** Get the Redis client instance */
-  private get client(): RedisClientType<
-    RedisModules,
-    RedisFunctions,
-    RedisScripts
-  > {
-    return getRedis();
-  }
-
-  constructor(options?: CacheServiceOptions) {
-    this.defaultTtl = options?.defaultTtl ?? 300;
-  }
-
-  /**
-   * Cache a value in a user-specific hash.
-   */
-  async setUserData<T>(
-    userId: string,
-    field: UserCacheFields,
-    value: T,
-    ttl = this.defaultTtl
-  ): Promise<void> {
-    const key = userCacheHashKey(userId);
-    try {
-      await this.hSetWithExpire(key, field, JSON.stringify(value), ttl);
-      logger.info("User data cached", { userId, key, field, ttl });
-    } catch (error) {
-      logger.error("Failed to cache user data", { error, userId, field });
-      throw error;
+  constructor(options?: UserCacheServiceOptions) {
+    const redisUrl = config.redisUrl;
+    if (!redisUrl) {
+      throw new Error('REDIS_URL environment variable is required');
     }
+
+    this.defaultTtl = options?.defaultTtl ?? 300;
+    this.hashCache = new HashCacheService(redisUrl, {
+      ttl: this.defaultTtl,
+      logger: options?.logger || logger,
+    });
   }
 
   /**
@@ -58,60 +39,25 @@ export class UserCacheService {
     const key = userCacheHashKey(userId);
 
     try {
-      const raw = await this.client.hGet(key, field);
-      return raw ? (JSON.parse(raw.toString()) as T) : null;
+      return await this.hashCache.getField<T>(key, field);
     } catch (error) {
-      logger.error("Failed to get user data", { error, userId, field });
+      logger.error('Failed to get user data', { error, userId, field });
       return null;
     }
   }
-
-  /**
-   * Delete one field from a user-specific hash.
-   */
-  async deleteUserData(userId: string, field: UserCacheFields): Promise<void> {
-    const key = userCacheHashKey(userId);
-    try {
-      await this.client.hDel(key, field);
-      logger.info("User data field deleted", { userId, key, field });
-    } catch (error) {
-      logger.error("Failed to delete user data field", {
-        error,
-        userId,
-        field,
-      });
-    }
-  }
-
-  /**
-   * Invalidate all cached fields for a user.
-   */
-  async invalidateUserCache(userId: string): Promise<void> {
-    const key = userCacheHashKey(userId);
-    try {
-      await this.client.del(key);
-      logger.info("User cache invalidated", { userId, key });
-    } catch (error) {
-      logger.error("Failed to invalidate user cache", { error, userId });
-    }
-  }
-
-  // Internal helpers
-
-  /**
-   * Atomically HSET and EXPIRE a Redis hash key.
-   */
-  private async hSetWithExpire(
-    key: string,
-    field: string,
-    value: string,
-    ttl: number
-  ): Promise<void> {
-    const pipeline = this.client.multi();
-    pipeline.hSet(key, field, value);
-    pipeline.expire(key, ttl);
-    await pipeline.exec();
-  }
 }
 
-export const userCacheService = new UserCacheService();
+let userCacheServiceInstance: UserCacheService | null = null;
+
+try {
+  userCacheServiceInstance = new UserCacheService({
+    defaultTtl: Number(config.CACHE_TTL),
+  });
+  logger.info('UserCacheService initialized successfully');
+} catch (error) {
+  logger.error('Failed to initialize UserCacheService', { error });
+  // We might want to create a fallback implementation that doesn't use Redis
+  // but for now, we'll just leave it as null
+}
+
+export const userCacheService = userCacheServiceInstance;

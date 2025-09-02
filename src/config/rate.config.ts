@@ -1,11 +1,7 @@
-import {
-  FiatCurrency,
-  PaymentMethodCategory,
-  PaymentMethodProvider,
-} from "@prisma/client";
+import { FiatCurrency, PaymentMethodCategory } from '@prisma/client';
 
 interface PaymentMethodConfig {
-  provider: PaymentMethodProvider;
+  provider: string;
   displayName: string;
   category: PaymentMethodCategory;
 }
@@ -20,14 +16,9 @@ export const rateConfigs: CountryConfig[] = [
     fiatCurrency: FiatCurrency.USD,
     paymentMethods: [
       {
-        provider: "BANK",
-        displayName: "Bank",
+        provider: 'ABA',
+        displayName: 'Cash',
         category: PaymentMethodCategory.BANK_TRANSFER,
-      },
-      {
-        provider: "CASH",
-        displayName: "Cash",
-        category: PaymentMethodCategory.CASH,
       },
     ],
   },
@@ -35,13 +26,13 @@ export const rateConfigs: CountryConfig[] = [
     fiatCurrency: FiatCurrency.KES,
     paymentMethods: [
       {
-        provider: PaymentMethodProvider.MPESA_KENYA,
-        displayName: "M-Pesa Kenya",
+        provider: 'MPesaKenya',
+        displayName: 'M-Pesa Kenya',
         category: PaymentMethodCategory.MOBILE_MONEY,
       },
       {
-        provider: "BANK",
-        displayName: "Bank",
+        provider: 'BANK',
+        displayName: 'Bank',
         category: PaymentMethodCategory.BANK_TRANSFER,
       },
     ],
@@ -50,13 +41,13 @@ export const rateConfigs: CountryConfig[] = [
     fiatCurrency: FiatCurrency.ETB,
     paymentMethods: [
       {
-        provider: PaymentMethodProvider.TELE_BIRR,
-        displayName: "Tele Birr",
+        provider: 'TeleBirr',
+        displayName: 'Tele Birr',
         category: PaymentMethodCategory.MOBILE_MONEY,
       },
       {
-        provider: PaymentMethodProvider.CBE,
-        displayName: "Commercial Bank of Ethiopia",
+        provider: 'CBE',
+        displayName: 'Commercial Bank of Ethiopia',
         category: PaymentMethodCategory.BANK_TRANSFER,
       },
     ],
@@ -65,13 +56,13 @@ export const rateConfigs: CountryConfig[] = [
     fiatCurrency: FiatCurrency.UGX,
     paymentMethods: [
       {
-        provider: PaymentMethodProvider.MTN_MOMO_UGANDA,
-        displayName: "MTN MoMo Uganda",
+        provider: 'MoMoNew',
+        displayName: 'MTN MoMo Uganda',
         category: PaymentMethodCategory.MOBILE_MONEY,
       },
       {
-        provider: PaymentMethodProvider.BANK,
-        displayName: "Bank",
+        provider: 'BANK',
+        displayName: 'Bank Transfer',
         category: PaymentMethodCategory.BANK_TRANSFER,
       },
     ],

@@ -1,18 +1,17 @@
 model SupportedPaymentMethod {
-  id              String                @id @default(uuid())
-  category        PaymentMethodCategory 
-  provider        PaymentMethodProvider 
-  displayName     String
-  currency        FiatCurrency
-  isActive        Boolean               @default(true)
-  logoUrl         String?
+  id                    String                @id @default(uuid())
+  category              PaymentMethodCategory 
+  provider              String 
+  displayName           String
+  currency              FiatCurrency
+  isActive              Boolean               @default(true)
+  logoUrl               String?
 
-  ads                 AdsOnPaymentMethods[]
-  userPaymentMethods  UserPaymentMethod[]
-  rates               FiatCryptoRate[] 
+  userPaymentMethods    UserPaymentMethod[]
+  rates                 FiatCryptoRate[] 
 
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
 
   @@unique([provider, currency])
   @@index([category])
@@ -31,6 +30,8 @@ model UserPaymentMethod {
 
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
+
+  ads                       AdsOnPaymentMethods[]
 
   supportedPaymentMethod    SupportedPaymentMethod @relation(fields: [supportedPaymentMethodId], references: [id], onDelete: Restrict)
   ordersAsPaymentMethod     Order[]      @relation("ordersAsPaymentMethod")
@@ -83,28 +84,29 @@ model TeleBirr {
 }
 
 model FiatCryptoRate {
-  id                 String       @id @default(uuid())
-  source             Source
-  fiatCurrency       FiatCurrency
-  cryptoCurrency     CryptoCurrency
-  rateType           RateType
+  id                                String       @id @default(uuid())
+  advNo                             String
+  source                            Source
+  paymentMethodProvider             String
+  fiatCurrency                      FiatCurrency
+  cryptoCurrency                    CryptoCurrency
+  rateType                          RateType
 
-  rawRate            Decimal      @db.Decimal(18, 8)
-  marginPercentage   Decimal      @db.Decimal(5, 2)
-  volumeAvailable    Decimal      @db.Decimal(36, 18)
-  minLimit           Decimal      @db.Decimal(18, 2)
-  maxLimit           Decimal      @db.Decimal(18, 2)
-  isActive           Boolean      @default(true)
+  rawRate                           Decimal      @db.Decimal(18, 8)
+  volumeAvailable                   Decimal      @db.Decimal(36, 18)
+  minLimit                          Decimal      @db.Decimal(18, 2)
+  maxLimit                          Decimal      @db.Decimal(18, 2)
+  isActive                          Boolean      @default(true)
 
-  fetchedAt          DateTime     @default(now())
-  expiresAt          DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  fetchedAt                         DateTime     @default(now())
+  expiresAt                         DateTime?
+  createdAt                         DateTime     @default(now())
+  updatedAt                         DateTime     @updatedAt
 
-  supportedPaymentMethodId String?
-  supportedPaymentMethod SupportedPaymentMethod? @relation(fields: [supportedPaymentMethodId], references: [id])
+  supportedPaymentMethodId          String?
+  supportedPaymentMethod            SupportedPaymentMethod? @relation(fields: [supportedPaymentMethodId], references: [id])
 
-  ads                Ad[]
+  ads                               Ad[]
   
 
   @@index([fiatCurrency, cryptoCurrency, rateType])

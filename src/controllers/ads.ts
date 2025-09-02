@@ -1,17 +1,17 @@
-import { Request, Response, Router } from "express";
+import { Request, Response, Router } from 'express';
 import {
   errorStatusMap,
   NotFoundError,
   UnauthenticatedError,
   UnauthorizedError,
-} from "@/lib/error";
-import { fetchAgentById } from "@/services/fetch-agents";
-import { getAuthContext } from "@/lib/utils/helpers";
-import { CreateAdSchema, UpdateAdSchema } from "@/schema/ads";
-import { AdsService } from "@/services/ads";
-import { Prisma, PrismaClient } from "@prisma/client";
-import { ApiResponse } from "@/types";
-import { EnrichedAgent } from "@/types/ad";
+} from '@/lib/error';
+import { fetchAgentById } from '@/services/fetch-agents';
+import { AdsService } from '@/services/ads';
+import { AdStatus, Prisma, PrismaClient, UserKycStatus, UserRole } from '@prisma/client';
+import { getAuthContext } from '@/lib/utils/helpers';
+import { ApiResponse } from '@/types';
+import { authenticate } from '@/middlewares/authenticate';
+import { authorize } from '@/middlewares/authorize';
 
 abstract class BaseController {
   protected sendSuccess<T>(res: Response, data?: T, message?: string): void {
@@ -21,11 +21,10 @@ abstract class BaseController {
 
   protected sendError(res: Response, error: any, context: string): void {
     console.error(`${context} error:`, error);
-
     const statusCode = errorStatusMap[error.constructor.name] || 500;
     const response: ApiResponse = {
       success: false,
-      error: error.message || "Internal server error",
+      error: error.message || 'Internal server error',
     };
 
     res.status(statusCode).json(response);
@@ -45,6 +44,11 @@ abstract class BaseController {
   }
 }
 
+/**
+ * Controller for managing ads.
+ * This controller handles incoming HTTP requests related to ads and delegates
+ * the business logic to the AdsService.
+ */
 export class AdsController extends BaseController {
   constructor(
     private prisma: PrismaClient,
@@ -53,167 +57,166 @@ export class AdsController extends BaseController {
     super();
   }
 
+  /**
+   * Retrieves the authenticated user ID from the request object.
+   * Throws an error if the user is not authenticated.
+   */
   private getUserId(req: Request): string {
     const userId = req.userId;
     if (!userId) {
-      throw new UnauthenticatedError("Authentication required.");
+      throw new UnauthenticatedError('Authentication required.');
     }
     return userId;
   }
 
-  private async getAgentProfile(
-    req: Request,
-    userId: string
+  /**
+   * This is a consolidated method to handle authentication and
+   * agent profile retrieval. It checks user roles and KYC status.
+   */
+  private async getAuthenticatedAgentProfile(
+    req: Request
   ): Promise<Prisma.AgentGetPayload<{}>> {
+    const userId = this.getUserId(req);
     const { accessToken } = getAuthContext(req);
-    const externalUser = await fetchAgentById(userId, accessToken);
+
+    const { data: user } = await fetchAgentById(userId, accessToken);
 
     if (
-      !externalUser ||
-      externalUser.role !== "AGENT" ||
-      externalUser.kycStatus !== "APPROVED"
+      !user ||
+      user.enumRole !== UserRole.AGENT ||
+      user.kycStatus !== UserKycStatus.APPROVED
     ) {
       throw new UnauthorizedError(
-        "Agent role with approved KYC is required to perform this action."
+        'Agent role with approved KYC is required to perform this action.'
       );
     }
 
-    const localAgentProfile = await this.prisma.agent.findUnique({
+    const localAgent = await this.prisma.agent.findUnique({
       where: { userId },
     });
 
-    if (!localAgentProfile) {
+    if (!localAgent) {
       throw new NotFoundError(
-        "Local agent profile not found. Please complete your P2P profile setup."
+        'Local agent profile not found. Please complete your P2P profile setup.'
       );
     }
 
-    return localAgentProfile;
+    return localAgent;
   }
 
-  private async getAuthenticatedAgent(req: Request) {
-    const userId = this.getUserId(req);
-    return await this.getAgentProfile(req, userId);
-  }
-
-  async getAds(req: Request, res: Response): Promise<void> {
-    await this.handleRequest(req, res, "getAds", async () => {
-      const ads = await this.adsService.getAds();
-      this.sendSuccess(res, ads, "Ads retrieved successfully.");
-    });
-  }
-
+  /**
+   * Handles the ad creation request.
+   */
   async createAd(req: Request, res: Response): Promise<void> {
-    await this.handleRequest(req, res, "createAd", async () => {
-      const agentProfile = await this.getAuthenticatedAgent(req);
-      const adData = CreateAdSchema.parse(req.body);
+    await this.handleRequest(req, res, 'createAd', async () => {
+      const agent = await this.getAuthenticatedAgentProfile(req);
+      const newAd = await this.adsService.createAd(agent.userId, req.body);
 
-      const { fiatCryptoRateId, ...restOfAdData } = adData;
-      const newAd = await this.adsService.createAd(agentProfile.id, {
-        fiatCryptoRateId,
-        ...restOfAdData,
-      });
-
-      this.sendSuccess(
-        res,
-        { ...newAd, agent: agentProfile },
-        "Ad created successfully."
-      );
+      this.sendSuccess(res, newAd, 'Ad created successfully.');
     });
   }
 
-  async getMyAds(req: Request, res: Response): Promise<void> {
-    await this.handleRequest(req, res, "getMyAds", async () => {
-      const agentProfile = await this.getAuthenticatedAgent(req);
-      const { status } = req.query;
+  /**
+   * Handles the request to get all ads.
+   * This is a public endpoint and does not require a logged-in user.
+   * It also supports basic pagination.
+   */
+  async getAllAds(req: Request, res: Response): Promise<void> {
+    await this.handleRequest(req, res, 'getAllAds', async () => {
+      // Extract optional query parameters for pagination and filtering
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const status = req.query.status as AdStatus;
 
-      const ads = await this.adsService.getMyAds(agentProfile.id);
-      const enrichedAds = ads.map((ad) => ({ ...ad, agent: agentProfile }));
+      const ads = await this.adsService.getAllAds({ page, limit, status });
 
-      this.sendSuccess(res, enrichedAds, "Your ads retrieved successfully.");
+      this.sendSuccess(res, ads, 'Ads fetched successfully.');
     });
   }
 
+  /**
+   * Handles the request to get a single ad by ID.
+   */
+  async getAdById(req: Request, res: Response): Promise<void> {
+    await this.handleRequest(req, res, 'getAdById', async () => {
+      const adId = req.params.id;
+      const ad = await this.adsService.getAdById(adId);
+
+      this.sendSuccess(res, ad, 'Ad fetched successfully.');
+    });
+  }
+
+  /**
+   * Handles the request to update an ad.
+   */
   async updateAd(req: Request, res: Response): Promise<void> {
-    await this.handleRequest(req, res, "updateAd", async () => {
-      const agentProfile = await this.getAuthenticatedAgent(req);
-      const { adId } = req.params;
-      const updateData = UpdateAdSchema.parse(req.body);
+    await this.handleRequest(req, res, 'updateAd', async () => {
+      const { id: adId } = req.params;
+      const userId = this.getUserId(req);
 
-      const updatedAd = await this.adsService.updateAd(
-        adId,
-        agentProfile.id,
-        updateData
-      );
+      const existingAd = await this.adsService.getAdById(adId);
+      if (existingAd.agent.userId !== userId) {
+        throw new UnauthorizedError('You are not the owner of this ad.');
+      }
 
-      this.sendSuccess(
-        res,
-        { ...updatedAd, agent: agentProfile },
-        "Ad updated successfully."
-      );
+      const updatedAd = await this.adsService.updateAd(adId, req.body);
+      this.sendSuccess(res, updatedAd, 'Ad updated successfully.');
     });
   }
 
+  /**
+   * Handles the request to delete an ad.
+   */
   async deleteAd(req: Request, res: Response): Promise<void> {
-    await this.handleRequest(req, res, "deleteAd", async () => {
-      const agentProfile = await this.getAuthenticatedAgent(req);
-      const { adId } = req.params;
+    await this.handleRequest(req, res, 'deleteAd', async () => {
+      const { id: adId } = req.params;
+      const userId = this.getUserId(req);
 
-      await this.adsService.deleteAd(adId, agentProfile.id);
-      this.sendSuccess(res, undefined, "Ad deleted successfully.");
+      const existingAd = await this.adsService.getAdById(adId);
+      if (existingAd.agent.userId !== userId) {
+        throw new UnauthorizedError('You are not the owner of this ad.');
+      }
+
+      await this.adsService.deleteAd(adId);
+      this.sendSuccess(res, null, 'Ad deleted successfully.');
     });
   }
 
-  async getAgentById(req: Request, res: Response): Promise<void> {
-    await this.handleRequest(req, res, "getAgentById", async () => {
-      const { accessToken } = getAuthContext(req);
-      const { agentId } = req.params;
-
-      const localAgent = await this.prisma.agent.findUnique({
-        where: { id: agentId },
-      });
-
-      if (!localAgent) {
-        throw new NotFoundError("Agent profile not found in this service.");
-      }
-
-      const externalAgentData = await fetchAgentById(
-        localAgent.userId,
-        accessToken
-      );
-
-      if (!externalAgentData) {
-        throw new NotFoundError("Agent not found in user service.");
-      }
-
-      const [stats, activeAds] = await Promise.all([
-        this.adsService.getAdStatsForAgent(localAgent.id),
-        this.adsService.getActiveAdsForAgent(localAgent.id),
-      ]);
-
-      const enrichedAgent: EnrichedAgent = {
-        externalData: externalAgentData,
-        profile: localAgent,
-        stats,
-        activeAds,
-      };
-
-      this.sendSuccess(res, enrichedAgent, "Agent retrieved successfully.");
-    });
-  }
-
+  /**
+   * Configures and returns the router with all ad-related routes.
+   */
   routes(): Router {
     const router = Router();
 
-    // Public routes
-    router.get("/agents/:agentId", this.getAgentById.bind(this));
-    router.get("/", this.getAds.bind(this));
+    router.get('/',  this.getAllAds.bind(this));
 
-    // Authenticated agent routes
-    router.post("/", this.createAd.bind(this));
-    router.get("/my", this.getMyAds.bind(this));
-    router.put("/:adId", this.updateAd.bind(this));
-    router.delete("/:adId", this.deleteAd.bind(this));
+    router.get('/:id', this.getAdById.bind(this));
+
+
+    // POST: Create a new ad.
+    router.post(
+      '/',
+      authenticate,
+      authorize({ requiredPermissions: ['ads:create'] }),
+      this.createAd.bind(this)
+    );
+
+    // PUT: Update an existing ad.
+    router.put(
+      '/:id',
+      authenticate,
+      authorize({ requiredPermissions: ['ads:update'] }),
+      this.updateAd.bind(this)
+    );
+
+    // DELETE: Delete an ad.
+    router.delete(
+      '/:id',
+      authenticate,
+
+      authorize({ requiredPermissions: ['ads:delete'] }),
+      this.deleteAd.bind(this)
+    );
 
     return router;
   }

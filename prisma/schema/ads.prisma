@@ -3,14 +3,14 @@ model AdsOnPaymentMethods {
   paymentMethodId       String
 
   ad                    Ad                     @relation(fields: [adId], references: [id])
-  paymentMethod         SupportedPaymentMethod @relation(fields: [paymentMethodId], references: [id])
+  paymentMethod         UserPaymentMethod   @relation(fields: [paymentMethodId], references: [id])
 
   @@id([adId, paymentMethodId])
 }
 
 model Ad {
   id                      String                @id @default(uuid())
-  adId                    String                @unique
+  advNo                   String                @unique
   agentId                 String
   fiatCryptoRateId        String   
   title                   String?

@@ -1,45 +1,34 @@
-import http from "http";
-import app from "@/app";
-import { config } from "@/config/env";
-import { logger } from "@/lib/logger";
-import { scheduleRateCleanup } from "@/services/cron";
-import { initRedis, shutdownRedis } from "@/config/radis";
-import kafkaInit, { disconnectKafka } from "@/config/kafka";
-import { getAppRolesPermissionsFromRedis } from "@/lib/cache-utils";
-import { InternalServerError } from "@/lib/error";
+import http from 'http';
+import app from '@/app';
+import { config } from '@/config/env';
+import { logger } from '@/lib/logger';
+import { initRedis, shutdownRedis } from '@/config/radis';
+import kafkaInit, { disconnectKafka } from '@/config/kafka';
+import { blacklistService } from '@/services/cache/blacklist-cache';
+import { scheduleRateCleanup } from './services/cron';
 
-const HOST = process.env.HOST || "0.0.0.0";
-const PORT = Number(config.port) || 5006;
+const HOST = process.env.HOST || '0.0.0.0';
+const PORT = Number(config.port) || 5001;
 
 async function bootstrap() {
-  try {
-    if (!config.jwtPublicKey) {
-      throw new InternalServerError("JWT keys must be defined in environment.");
-    }
-
-    if (!config.commissionPercent || isNaN(Number(config.commissionPercent))) {
-      throw new InternalServerError(
-        "Commission percent must be defined and a number."
-      );
-    }
-
-    await kafkaInit();
-    await initRedis();
-
-    await getAppRolesPermissionsFromRedis();
-    logger.info("✅ RBAC data is available in Redis");
-  } catch (error) {
-    logger.warn("⚠️  RBAC data not yet available in Redis.");
-    logger.warn(
-      "This is expected if Auth service is starting up or hasn't loaded data yet."
-    );
+  if (!config.jwtPublicKey) {
+    throw new Error('JWT keys must be defined in environment.');
   }
+
+  logger.info('Connecting to Kafka…');
+  await kafkaInit();
+
+  logger.info('Connecting to Redis…');
+  await initRedis();
 }
+
 async function startServer() {
   try {
     await bootstrap();
 
-    const ratesCron = scheduleRateCleanup();
+    logger.info('Starting scheduled tasks…');
+    const ratesCrons = scheduleRateCleanup();
+    ratesCrons.start();
 
     const server = http.createServer(app);
     server.listen(PORT, HOST, () => {
@@ -50,36 +39,53 @@ async function startServer() {
     const graceful = async (signal: string) => {
       logger.info(`Received ${signal}, shutting down…`);
 
-      // Stop accepting new HTTP
+      // Stop accepting new HTTP connections
       server.close((err) => {
-        if (err) logger.error("Error closing HTTP server:", err);
-        else logger.info("HTTP server closed");
+        if (err) logger.error('Error closing HTTP server:', err);
+        else logger.info('HTTP server closed');
       });
 
-      // stop cron
-      ratesCron.stop();
-      logger.info("Cron job stopped");
+      // Close cache services
+      await shutdownCacheServices();
 
       // Kafka & Redis cleanup
       await disconnectKafka();
       await shutdownRedis();
 
+      // close scheduled tasks
+      ratesCrons.stop();
       process.exit(0);
     };
 
-    process.on("SIGINT", () => graceful("SIGINT"));
-    process.on("SIGTERM", () => graceful("SIGTERM"));
+    // Add shutdown method to cache services
+    async function shutdownCacheServices() {
+      try {
+        if (
+          blacklistService &&
+          typeof (blacklistService as any).disconnect === 'function'
+        ) {
+          await (blacklistService as any).disconnect();
+          logger.info('BlacklistService disconnected');
+        }
+      } catch (error) {
+        logger.error('Error shutting down cache services', { error });
+      }
+    }
 
-    process.on("uncaughtException", (err) => {
-      logger.error("Uncaught exception:", err);
+    process.on('SIGINT', () => graceful('SIGINT'));
+    process.on('SIGTERM', () => graceful('SIGTERM'));
+
+    process.on('uncaughtException', (err) => {
+      logger.error('Uncaught exception:', err);
       process.exit(1);
     });
-    process.on("unhandledRejection", (reason) => {
-      logger.error("Unhandled rejection:", reason);
+
+    process.on('unhandledRejection', (reason) => {
+      logger.error('Unhandled rejection:', reason);
       process.exit(1);
     });
   } catch (err) {
-    logger.error("Bootstrap failed:", err);
+    logger.error('Bootstrap failed:', err);
     process.exit(1);
   }
 }

@@ -4,13 +4,13 @@ import {
   FiatCurrency,
   CryptoCurrency,
   PaymentMethodCategory,
-  PaymentMethodProvider,
-} from "@prisma/client";
+  Ad,
+} from '@prisma/client';
 
-import { prisma } from "@/lib/prisma";
-import { getBinanceRates } from "@/utils/rate-fetcher";
-import { Decimal } from "@prisma/client/runtime/library";
-import { rateConfigs } from "@/config/rate.config";
+import { prisma } from '@/lib/prisma';
+import { getBinanceRates, ProcessedAd } from '@/utils/rate-fetcher';
+import { Decimal } from '@prisma/client/runtime/library';
+import { rateConfigs } from '@/config/rate.config';
 
 const DEFAULT_MARGIN_PERCENTAGE = new Decimal(2.5);
 const RATE_EXPIRY_MINUTES = 5;
@@ -24,7 +24,7 @@ const RATE_EXPIRY_MINUTES = 5;
 async function seedSupportedPaymentMethods(
   fiatCurrency: FiatCurrency,
   paymentMethods: {
-    provider: PaymentMethodProvider;
+    provider: string;
     displayName: string;
     category: PaymentMethodCategory;
   }[]
@@ -104,7 +104,7 @@ async function storeBinanceRates(
   fiatCurrency: FiatCurrency,
   paymentMethodProvider: string,
   rateType: RateType,
-  ads: any[],
+  ads: ProcessedAd[],
   idMap: Record<string, string>
 ) {
   if (ads.length === 0) {
@@ -134,11 +134,11 @@ async function storeBinanceRates(
       rateType: rateType,
       supportedPaymentMethodId: paymentMethodId,
       rawRate: String(ad.rawRate),
-      marginPercentage: String(DEFAULT_MARGIN_PERCENTAGE),
       volumeAvailable: String(ad.volumeAvailable),
-      minLimit: String(ad.minLimitFiat),
-      maxLimit: String(ad.maxLimitFiat),
-      adId: ad.adId,
+      minLimit: String(ad.minLimit),
+      maxLimit: String(ad.maxLimit),
+      advNo: ad.advNo,
+      paymentMethodProvider: ad.paymentMethodProvider,
       expiresAt: expiresAt,
     };
   });
@@ -168,9 +168,7 @@ async function fetchAndStoreBinanceRatesForCountry(
 ) {
   const { fiatCurrency, paymentMethods } = config;
 
-  console.log(`Starting to fetch rates for ${fiatCurrency}...`);
-
-  await seedSupportedPaymentMethods(fiatCurrency, paymentMethods);
+  await seedSupportedPaymentMethods(fiatCurrency, paymentMethods as any);
   const idMap = await getPaymentMethodIdMap(fiatCurrency);
 
   const tasks = paymentMethods.flatMap((method) => [
@@ -234,10 +232,10 @@ export async function fetchAndStoreAllBinanceRates() {
       fetchAndStoreBinanceRatesForCountry(config)
     );
     await Promise.all(tasks);
-    console.log("All Binance rates successfully fetched and stored.");
+    console.log('All Binance rates successfully fetched and stored.');
   } catch (error) {
     console.error(
-      "An error occurred during the overall rate fetching process:",
+      'An error occurred during the overall rate fetching process:',
       error
     );
   }

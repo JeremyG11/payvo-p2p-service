@@ -1,17 +1,12 @@
-import { Request, Response, Router } from "express";
-import {
-  FiatCurrency,
-  PrismaClient,
-  RateType,
-  PaymentMethodProvider,
-} from "@prisma/client";
+import { Request, Response, Router } from 'express';
+import { FiatCurrency, PrismaClient, RateType } from '@prisma/client';
 import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
-} from "@/lib/error";
-import { asyncWrapper } from "@/middlewares/error";
-import { rateConfigs } from "@/config/rate.config";
+} from '@/lib/error';
+import { asyncWrapper } from '@/middlewares/error';
+import { rateConfigs } from '@/config/rate.config';
 
 // Define a type for the expected response from getBestRates
 interface BestRateResponse {
@@ -59,7 +54,7 @@ export class RateController {
    */
   private async getBestRates(
     fiatCurrency: FiatCurrency,
-    paymentMethodProvider: PaymentMethodProvider
+    paymentMethodProvider: string
   ): Promise<BestRateResponse> {
     const supportedMethod = await this.prisma.supportedPaymentMethod.findUnique(
       {
@@ -88,7 +83,7 @@ export class RateController {
           supportedPaymentMethodId: paymentMethodId,
           rateType: RateType.BUY,
         },
-        orderBy: [{ rawRate: "asc" }, { fetchedAt: "desc" }],
+        orderBy: [{ rawRate: 'asc' }, { fetchedAt: 'desc' }],
       }),
       this.prisma.fiatCryptoRate.findFirst({
         where: {
@@ -96,7 +91,7 @@ export class RateController {
           supportedPaymentMethodId: paymentMethodId,
           rateType: RateType.SELL,
         },
-        orderBy: [{ rawRate: "desc" }, { fetchedAt: "desc" }],
+        orderBy: [{ rawRate: 'desc' }, { fetchedAt: 'desc' }],
       }),
     ]);
 
@@ -107,7 +102,7 @@ export class RateController {
     }
 
     return {
-      source: "Binance",
+      source: 'Binance',
       currencyPair: `USDT_${fiatCurrency}`,
       paymentMethod: paymentMethodProvider,
       bestBuy: bestBuyRate?.toString() ?? null,
@@ -148,14 +143,14 @@ export class RateController {
     }
 
     if (
-      !allSupportedProviders.includes(paymentMethod as PaymentMethodProvider)
+      !allSupportedProviders.includes(paymentMethod)
     ) {
       throw new BadRequestError(`Invalid payment method: ${paymentMethod}`);
     }
 
     const rates = await this.getBestRates(
       currency,
-      paymentMethod as PaymentMethodProvider
+      paymentMethod
     );
 
     res.status(200).json(rates);
@@ -175,7 +170,7 @@ export class RateController {
     try {
       const rates = await this.prisma.fiatCryptoRate.findMany({
         where: { fiatCurrency: currency },
-        orderBy: [{ fetchedAt: "desc" }],
+        orderBy: [{ fetchedAt: 'desc' }],
       });
       res.status(200).json(rates);
     } catch (error) {
@@ -193,7 +188,7 @@ export class RateController {
      * @example: GET /rates/usdt/kes/mpesakenya
      */
     this.router.get(
-      "/usdt/:fiatCurrency/:paymentMethod",
+      '/usdt/:fiatCurrency/:paymentMethod',
       asyncWrapper(this.getBestRatesForPair)
     );
 
@@ -201,6 +196,6 @@ export class RateController {
      * Route to get all rates for a specific fiat currency
      * @example: GET /rates/kes
      */
-    this.router.get("/:fiatCurrency", asyncWrapper(this.getRatesByCurrency));
+    this.router.get('/:fiatCurrency', asyncWrapper(this.getRatesByCurrency));
   }
 }

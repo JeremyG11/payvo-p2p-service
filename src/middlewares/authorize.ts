@@ -25,10 +25,10 @@
  * - Responds with 403 if authorization fails.
  * - Responds with 500 if roles/permissions data is unavailable or on internal error.
  */
-import { logger } from "@/lib/logger";
-import { Request, Response, NextFunction } from "express";
-import { UserRole as PrismaUserRole } from "@prisma/client";
-import { getAppRolesPermissionsFromRedis } from "@/lib/cache-utils";
+import { logger } from '@/lib/logger';
+import { Request, Response, NextFunction } from 'express';
+import { UserRole as PrismaUserRole } from '@prisma/client';
+import { appCacheService } from '@/services/cache/app-cache';
 
 interface AuthorizeOptions {
   requiredPermissions?: string[];
@@ -40,13 +40,13 @@ export const authorize = (options: AuthorizeOptions = {}) => {
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rolesAndPermissions = await getAppRolesPermissionsFromRedis();
+      const rolesPermissions = await appCacheService.getRolesAndPermissions();
 
-      if (!rolesAndPermissions) {
-        logger.error("Roles and permissions data is not available in cache.");
+      if (!rolesPermissions) {
+        logger.error('Roles and permissions data is not available in cache.');
         res.status(500).json({
-          code: "ServerError",
-          message: "Roles and permissions data is not available.",
+          code: 'ServerError',
+          message: 'Roles and permissions data is not available.',
         });
         return;
       }
@@ -57,9 +57,9 @@ export const authorize = (options: AuthorizeOptions = {}) => {
         !req.userPermissions
       ) {
         res.status(401).json({
-          code: "AuthenticationError",
+          code: 'AuthenticationError',
           message:
-            "Authentication required. Missing user ID, role, or permissions.",
+            'Authentication required. Missing user ID, role, or permissions.',
         });
         return;
       }
@@ -79,8 +79,8 @@ export const authorize = (options: AuthorizeOptions = {}) => {
         const minRequiredRoleLevel = roleHierarchy[minRole];
         if (currentUserRoleLevel < minRequiredRoleLevel) {
           res.status(403).json({
-            code: "AuthorizationError",
-            message: "Access denied, insufficient role level.",
+            code: 'AuthorizationError',
+            message: 'Access denied, insufficient role level.',
           });
           return;
         }
@@ -104,8 +104,8 @@ export const authorize = (options: AuthorizeOptions = {}) => {
 
       if (!hasAllRequiredPermissions) {
         res.status(403).json({
-          code: "AuthorizationError",
-          message: "Access denied, insufficient granular permissions.",
+          code: 'AuthorizationError',
+          message: 'Access denied, insufficient granular permissions.',
         });
         return;
       }
@@ -113,10 +113,10 @@ export const authorize = (options: AuthorizeOptions = {}) => {
       next();
       return;
     } catch (error) {
-      logger.error("Error in authorization middleware:", error);
+      logger.error('Error in authorization middleware:', error);
       res.status(500).json({
-        code: "ServerError",
-        message: "Internal server error during authorization.",
+        code: 'ServerError',
+        message: 'Internal server error during authorization.',
       });
       return;
     }

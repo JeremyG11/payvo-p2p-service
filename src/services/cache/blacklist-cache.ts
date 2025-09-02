@@ -1,20 +1,15 @@
-import {
-  RedisModules,
-  RedisScripts,
-  RedisFunctions,
-  RedisClientType,
-} from "redis";
-import { logger } from "@/lib/logger";
-import { getRedis } from "@/config/radis";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import { logger } from '@/lib/logger';
+import { HashCacheService } from '@payvo/redis';
+import jwt, { JwtPayload } from 'jsonwebtoken';
+import { config } from '@/config/env';
 
 export enum BlacklistType {
-  JTI = "jti",
-  USER = "uid",
+  JTI = 'jti',
+  USER = 'uid',
 }
 
 /** All blacklist entries live in this single Redis hash. */
-const BLACKLIST_HASH_KEY = "blacklist";
+const BLACKLIST_HASH_KEY = 'blacklist';
 
 /** Build the field name inside the hash (e.g. `jti:abc123`). */
 function makeField(type: BlacklistType, id: string) {
@@ -30,98 +25,85 @@ function decodeToken(token: string): (JwtPayload & { jti?: string }) | null {
   }
 }
 
-class BlacklistService {
-  //   private client = ;
-  private get client(): RedisClientType<
-    RedisModules,
-    RedisFunctions,
-    RedisScripts
-  > {
-    return getRedis();
-  }
+class ReadOnlyBlacklistService {
+  private hashCache: HashCacheService;
+  private isInitialized = false;
 
-  /** Core: add an entry to the hash, then bump the hash TTL. */
-  private async add(
-    type: BlacklistType,
-    id: string,
-    metadata: Record<string, unknown>,
-    ttlSeconds: number
-  ) {
-    const field = makeField(type, id);
-    await this.client.hSet(
-      BLACKLIST_HASH_KEY,
-      field,
-      JSON.stringify({ timestamp: Date.now(), metadata })
-    );
-    // Reset the hash TTL so that all entries expire automatically
-    await this.client.expire(BLACKLIST_HASH_KEY, ttlSeconds);
-    logger.info(`Blacklisted ${field} for ${ttlSeconds}s`, metadata);
+  constructor() {
+    const redisUrl = config.redisUrl;
+    if (!redisUrl) {
+      logger.warn(
+        'REDIS_URL environment variable is not defined - blacklist functionality will be disabled'
+      );
+      return;
+    }
+
+    try {
+      this.hashCache = new HashCacheService(redisUrl, { logger });
+      this.isInitialized = true;
+      logger.info('ReadOnlyBlacklistService initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize ReadOnlyBlacklistService', { error });
+      this.isInitialized = false;
+    }
   }
 
   /** Core: check if field exists in the hash. */
   private async is(type: BlacklistType, id: string): Promise<boolean> {
-    const field = makeField(type, id);
-    const entry = await this.client.hGet(BLACKLIST_HASH_KEY, field);
-    if (entry) {
-      logger.warn(`Attempt to use blacklisted ${field}`);
-      return true;
+    if (!this.isInitialized) {
+      logger.warn('Blacklist service not available - skipping blacklist check');
+      return false;
     }
-    return false;
-  }
 
-  /** Core: remove a single field from the hash. */
-  private async remove(type: BlacklistType, id: string) {
     const field = makeField(type, id);
-    await this.client.hDel(BLACKLIST_HASH_KEY, field);
-    logger.info(`Removed blacklist entry ${field}`);
+    try {
+      const entry = await this.hashCache.getField<any>(
+        BLACKLIST_HASH_KEY,
+        field
+      );
+      if (entry) {
+        logger.warn(`Attempt to use blacklisted ${field}`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      logger.error('Failed to check blacklist', { error, type, id });
+      return false;
+    }
   }
 
-  // —— Public API —— //
-
-  /** Blacklist a JWT’s jti until it naturally expires. */
-  public async blacklistToken(
-    token: string,
-    opts: { reason?: string; deviceId?: string; [k: string]: unknown } = {}
-  ) {
-    const decoded = decodeToken(token);
-    const jti = decoded?.jti;
-    const exp = decoded?.exp;
-    if (!jti || !exp) return;
-    const now = Math.floor(Date.now() / 1000);
-    const ttl = exp - now;
-    if (ttl <= 0) return;
-    await this.add(BlacklistType.JTI, jti, opts, ttl);
-  }
-
-  /** Is this JWT’s jti currently blacklisted? */
+  /** Is this JWT's jti currently blacklisted? */
   public async isTokenBlacklisted(token: string): Promise<boolean> {
+    if (!this.isInitialized) {
+      return false;
+    }
+
     const decoded = decodeToken(token);
     return decoded?.jti ? this.is(BlacklistType.JTI, decoded.jti) : false;
   }
 
-  /** Remove a JWT jti from the blacklist (emergency). */
-  public async removeTokenJti(jti: string): Promise<void> {
-    await this.remove(BlacklistType.JTI, jti);
-  }
-
-  /** Globally blacklist a user (e.g. after password reset). */
-  public async blacklistUser(
-    userId: string,
-    ttlSeconds: number,
-    opts: { reason?: string } = {}
-  ) {
-    await this.add(BlacklistType.USER, userId, opts, ttlSeconds);
-  }
-
   /** Is this user globally blacklisted? */
   public async isUserBlacklisted(userId: string): Promise<boolean> {
+    if (!this.isInitialized) {
+      return false; // If blacklist service is down, assume user is not blacklisted
+    }
+
     return this.is(BlacklistType.USER, userId);
   }
 
-  /** Remove a user from the blacklist. */
-  public async removeUser(userId: string): Promise<void> {
-    await this.remove(BlacklistType.USER, userId);
+  /** Check if the service is available */
+  public isAvailable(): boolean {
+    return this.isInitialized;
   }
 }
 
-export const blacklistService = new BlacklistService();
+// Initialize the service
+let blacklistServiceInstance: ReadOnlyBlacklistService | null = null;
+
+try {
+  blacklistServiceInstance = new ReadOnlyBlacklistService();
+} catch (error) {
+  logger.error('Failed to initialize ReadOnlyBlacklistService', { error });
+}
+
+export const blacklistService = blacklistServiceInstance;

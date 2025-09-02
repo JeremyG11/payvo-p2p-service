@@ -39,11 +39,9 @@ enum RateType {
 
 enum UnitedStatesPaymentMethod {
   BANK
-  CASH
 }
 enum KenyaPaymentMethod {
   MPesaKenya
-  BANK
 }
 
 enum EthiopiaPaymentMethod {
@@ -52,7 +50,6 @@ enum EthiopiaPaymentMethod {
 }
 
 enum UgandaPaymentMethod {
-  BANK
   MoMoNew
 }
 
@@ -68,15 +65,7 @@ enum KycStatus {
   VERIFIED
   REJECTED
 }
-
-enum PaymentMethodProvider {
-  MPESA_KENYA
-  CBE
-  TELE_BIRR
-  BANK
-  MTN_MOMO_UGANDA
-  CASH
-} 
+ 
  
 
 enum OrderStatus {

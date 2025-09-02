@@ -1,9 +1,9 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
   // basic
-  env: process.env.NODE_ENV || "development",
+  env: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 5006,
   serviceName: process.env.SERVICE_NAME,
 
@@ -13,15 +13,16 @@ export const config = {
   // kafka
   kafka: {
     brokers: process.env.KAFKA_BROKERS
-      ? process.env.KAFKA_BROKERS.split(",")
-      : ["localhost:9092"],
+      ? process.env.KAFKA_BROKERS.split(',')
+      : ['localhost:9092'],
 
-    clientId: process.env.KAFKA_CLIENT_ID || "payvo-p2p-service",
-    groupId: process.env.KAFKA_GROUP_ID || "p2p-service-group",
+    clientId: process.env.KAFKA_CLIENT_ID || 'payvo-p2p-service',
+    groupId: process.env.KAFKA_GROUP_ID || 'p2p-service-group',
   },
 
   // redis
-  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
+  redisUrl: process.env.REDIS_URL,
+  CACHE_TTL: process.env.CACHE_TTL || 3600,
 
   // jwt
   jwtSecret: process.env.JWT_SECRET!,

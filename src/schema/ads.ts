@@ -4,7 +4,6 @@ export const CreateAdSchema = z
 
   .object({
     fiatCryptoRateId: z.string().min(1, "Invalid rate ID"),
-    adId: z.string().min(1, "Invalid ad ID"),
     availableAmount: z.coerce
       .number({
         error: "Available amount must be a number",
