@@ -1,5 +1,5 @@
 import {
-  RateType,
+  AdType,
   Source,
   FiatCurrency,
   CryptoCurrency,
@@ -103,13 +103,13 @@ async function getPaymentMethodIdMap(fiatCurrency: FiatCurrency) {
 async function storeBinanceRates(
   fiatCurrency: FiatCurrency,
   paymentMethodProvider: string,
-  rateType: RateType,
+  adType: AdType,
   ads: ProcessedAd[],
   idMap: Record<string, string>
 ) {
   if (ads.length === 0) {
     console.log(
-      `No ads to store for ${fiatCurrency} - ${paymentMethodProvider} (${rateType}).`
+      `No ads to store for ${fiatCurrency} - ${paymentMethodProvider} (${adType}).`
     );
     return;
   }
@@ -131,7 +131,7 @@ async function storeBinanceRates(
       source: Source.BINANCE,
       fiatCurrency: fiatCurrency,
       cryptoCurrency: CryptoCurrency.USDT,
-      rateType: rateType,
+      adType: AdType.BUY,
       supportedPaymentMethodId: paymentMethodId,
       rawRate: String(ad.rawRate),
       volumeAvailable: String(ad.volumeAvailable),
@@ -149,11 +149,11 @@ async function storeBinanceRates(
       skipDuplicates: true,
     });
     console.log(
-      `Successfully stored ${result.count} rates for ${fiatCurrency} - ${paymentMethodProvider} (${rateType}).`
+      `Successfully stored ${result.count} rates for ${fiatCurrency} - ${paymentMethodProvider} (${adType}).`
     );
   } catch (error) {
     console.error(
-      `Failed to store rates for ${fiatCurrency} - ${paymentMethodProvider} (${rateType}):`,
+      `Failed to store rates for ${fiatCurrency} - ${paymentMethodProvider} (${adType}):`,
       error
     );
   }
@@ -177,13 +177,13 @@ async function fetchAndStoreBinanceRatesForCountry(
         const buyAds = await getBinanceRates(
           fiatCurrency,
           [method.provider],
-          RateType.BUY,
+          AdType.BUY,
           3
         );
         await storeBinanceRates(
           fiatCurrency,
           method.provider,
-          RateType.BUY,
+          AdType.BUY,
           buyAds,
           idMap
         );
@@ -199,13 +199,13 @@ async function fetchAndStoreBinanceRatesForCountry(
         const sellAds = await getBinanceRates(
           fiatCurrency,
           [method.provider],
-          RateType.SELL,
+          AdType.SELL,
           3
         );
         await storeBinanceRates(
           fiatCurrency,
           method.provider,
-          RateType.SELL,
+          AdType.SELL,
           sellAds,
           idMap
         );

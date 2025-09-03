@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Decimal } from '@prisma/client/runtime/library';
-import { RateType, CryptoCurrency, FiatCurrency } from '@prisma/client';
+import { AdType, CryptoCurrency, FiatCurrency } from '@prisma/client';
 
 const BINANCE_P2P_URL =
   'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search';
@@ -38,7 +38,7 @@ export interface ProcessedAd {
 
 async function fetchBinanceP2PAds(
   fiat: string,
-  tradeType: RateType = RateType.SELL,
+  tradeType: AdType = AdType.SELL,
   payTypes: string[] = [],
   limit: number = 3
 ): Promise<ProcessedAd[]> {
@@ -104,8 +104,8 @@ async function fetchBinanceP2PAds(
 export async function getBinanceRates(
   fiat: FiatCurrency,
   payTypes: string[] = [],
-  rateType: RateType = RateType.SELL,
+  adType: AdType = AdType.SELL,
   limit: number = 3
 ): Promise<ProcessedAd[]> {
-  return await fetchBinanceP2PAds(fiat, rateType, payTypes, limit);
+  return await fetchBinanceP2PAds(fiat, adType, payTypes, limit);
 }

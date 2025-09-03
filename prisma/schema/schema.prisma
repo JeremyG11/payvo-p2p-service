@@ -32,10 +32,10 @@ model Agent {
   commissionRate     Decimal  @db.Decimal(5, 2) @default(0.0)
   rating             Decimal  @db.Decimal(3, 2) @default(0.0)
 
-
-  ads               Ad[]
-  orders            Order[]
-  disputes          Dispute[] @relation("AgentDisputes")
+  balances           Balance[]
+  ads                Ad[]
+  orders             Order[]
+  disputes           Dispute[] @relation("AgentDisputes")
 
   @@index([userId])
 }

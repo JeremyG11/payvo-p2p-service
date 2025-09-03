@@ -1,6 +1,6 @@
 import request from "supertest";
 import { describe, it, beforeEach, expect, vi } from "vitest";
-import { SupportedPaymentMethodType, FiatCurrency } from "@prisma/client";
+import { PaymentMethodCategory, FiatCurrency } from "@prisma/client";
 import express, { Request, Application, Response, NextFunction } from "express";
 import { PaymentController } from "../../src/controllers/payments";
 
@@ -51,31 +51,38 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   req.userId = "test-user-id";
   next();
 });
-app.use("/payments", paymentController.routes());
+app.use(
+  "/payments/payment-methods",
+  (req, _res, next) => {
+    req.userId = "test-user-id";
+    next();
+  },
+  paymentController.routes()
+);
 
 describe("PaymentController API — CBE endpoints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  //  GET /payments/methods/cbe
+  //  GET /payment-methods/methods/cbe
   it("should return 200 and an array of CBE accounts", async () => {
     mockPrisma.cbe.findMany.mockResolvedValue([
-      { id: "cbe1", accountNumber: "12345678" },
+      { id: "cbe1", accountNumber: "1234567890111" },
     ]);
-    const res = await request(app).get("/payments/methods/cbe");
+    const res = await request(app).get("/payments/payment-methods/methods/cbe");
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
-    expect(res.body.data[0].accountNumber).toBe("12345678");
+    expect(res.body.data[0].accountNumber).toBe("1234567890111");
   });
 
-  //  POST /payments/methods/cbe
+  //  POST /payment-methods/methods/cbe
   it("should create a new CBE account", async () => {
     const mockSupportedMethod = {
       id: "sup-cbe",
-      type: SupportedPaymentMethodType.BANK_ACCOUNT,
+      type: PaymentMethodCategory.BANK_TRANSFER,
       method: "Commercial Bank of Ethiopia",
       currency: FiatCurrency.ETB,
       isActive: true,
@@ -94,43 +101,46 @@ describe("PaymentController API — CBE endpoints", () => {
     });
     const newAccount = {
       id: "upm-cbe-1",
-      accountNumber: "87654321",
+      accountNumber: "1234567890111",
       accountName: "John Doe",
     };
     mockPrisma.cbe.create.mockResolvedValue(newAccount);
 
-    const res = await request(app).post("/payments/methods/cbe").send({
-      accountNumber: "87654321",
-      accountName: "John Doe",
-      isDefault: true,
-    });
+    const res = await request(app)
+      .post("/payments/payment-methods/methods/cbe")
+      .send({
+        accountNumber: "1234567890111",
+        accountName: "John Doe",
+        isDefault: true,
+      });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toEqual(
       expect.objectContaining({
-        accountNumber: "87654321",
+        accountNumber: "1234567890111",
         accountName: "John Doe",
       })
     );
     expect(res.body.message).toBe("cbe account added successfully");
   });
 
-  //  POST /payments/methods/cbe - Error Cases
+  //  POST /payments/payment-methods/methods/cbe - Error Cases
   it("should return 400 if accountNumber is missing", async () => {
     const res = await request(app)
-      .post("/payments/methods/cbe")
+      .post("/payments/payment-methods/methods/cbe")
       .send({ accountName: "John Doe" });
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
     expect(res.body.error).toBe("Invalid input data");
   });
+
   it("should return 400 for duplicate account number", async () => {
     // Mock the supported payment method lookup
     mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue({
       id: "sup-cbe",
-      type: SupportedPaymentMethodType.BANK_ACCOUNT,
+      type: PaymentMethodCategory.BANK_TRANSFER,
       method: "Commercial Bank of Ethiopia",
       currency: FiatCurrency.ETB,
       isActive: true,
@@ -141,7 +151,7 @@ describe("PaymentController API — CBE endpoints", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({
         id: "existing-id",
-        accountNumber: "12345678901",
+        accountNumber: "1234567890111",
         accountName: "Jane Doe",
         userId: "some-user-id",
         createdAt: new Date(),
@@ -149,8 +159,8 @@ describe("PaymentController API — CBE endpoints", () => {
       });
 
     const res = await request(app)
-      .post("/payments/methods/cbe")
-      .send({ accountNumber: "12345678901", accountName: "Jane Doe" });
+      .post("/payments/payment-methods/methods/cbe")
+      .send({ accountNumber: "1234567890111", accountName: "Jane Doe" });
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
@@ -161,8 +171,17 @@ describe("PaymentController API — CBE endpoints", () => {
   it("should return 401 if user is missing", async () => {
     const unauthApp = express();
     unauthApp.use(express.json());
-    unauthApp.use("/payments", paymentController.routes());
-    const res = await request(unauthApp).get("/payments/methods/cbe");
+    unauthApp.use(
+      "/payments/payment-methods",
+      (req, _res, next) => {
+        req.userId = "test-user-id";
+        next();
+      },
+      paymentController.routes()
+    );
+    const res = await request(unauthApp).get(
+      "/payments/payment-methods/methods/cbe"
+    );
 
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);

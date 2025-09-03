@@ -1,13 +1,9 @@
 import request from "supertest";
 import { describe, it, beforeEach, expect, vi } from "vitest";
 import {
-  SupportedPaymentMethodType,
+  PaymentMethodCategory,
   FiatCurrency,
   SupportedPaymentMethod,
-  MPesaKenya,
-  Cbe,
-  TeleBirr,
-  UserPaymentMethod,
 } from "@prisma/client";
 import express, { Request, Application, Response, NextFunction } from "express";
 import { PaymentController } from "../../src/controllers/payments";
@@ -25,31 +21,34 @@ declare global {
 const mockSupportedMethods: SupportedPaymentMethod[] = [
   {
     id: "sup-mpesa",
-    name: "M-Pesa",
-    type: SupportedPaymentMethodType.MOBILE_MONEY,
+    provider: "MPesaKenya",
+    displayName: "M-Pesa Kenya",
+    category: PaymentMethodCategory.MOBILE_MONEY,
     currency: FiatCurrency.KES,
     isActive: true,
-    logo: "url/mpesa.png",
+    logoUrl: "url/mpesa.png",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     id: "sup-cbe",
-    name: "Commercial Bank of Ethiopia",
-    type: SupportedPaymentMethodType.BANK_ACCOUNT,
+    provider: "Cbe",
+    displayName: "Commercial Bank of Ethiopia",
+    category: PaymentMethodCategory.BANK_TRANSFER,
     currency: FiatCurrency.ETB,
     isActive: true,
-    logo: "url/cbe.png",
+    logoUrl: "url/cbe.png",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     id: "sup-telebirr",
-    name: "TeleBirr",
-    type: SupportedPaymentMethodType.MOBILE_MONEY,
+    provider: "TeleBirr",
+    displayName: "TeleBirr",
+    category: PaymentMethodCategory.MOBILE_MONEY,
     currency: FiatCurrency.ETB,
     isActive: true,
-    logo: "url/telebirr.png",
+    logoUrl: "url/telebirr.png",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -100,7 +99,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   req.userId = "user123";
   next();
 });
-app.use("/payments/payment-methods", paymentController.routes());
+app.use(
+  "/payments/payment-methods",
+  (req: Request, res: Response, next: NextFunction) => {
+    req.userId = "user123";
+    next();
+  },
+  paymentController.routes()
+);
 
 describe("PaymentController API", () => {
   beforeEach(() => {
@@ -127,18 +133,24 @@ describe("PaymentController API", () => {
     it("should return 401 if user is not authenticated", async () => {
       const unauthApp = express();
       unauthApp.use(express.json());
-      unauthApp.use("/payments", paymentController.routes());
-
-      const response = await request(unauthApp).get(
-        "/payments/payment-methods"
+      const unauthController = new PaymentController(mockPrisma as any);
+      unauthApp.use(
+        "/payments/payment-methods",
+        (req: Request, res: Response, next: NextFunction) => {
+          req.userId = undefined; // Simulate unauthenticated user
+          next();
+        },
+        unauthController.routes()
       );
+
+      const response = await request(unauthApp).get("/payments/payment-methods");
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe("Authentication required");
     });
   });
 
-  describe("POST /payments/methods/:methodName", () => {
+  describe("POST /payments/payment-methods/methods/:methodName", () => {
     it("should create a new M-Pesa account successfully", async () => {
       mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue(
         mockSupportedMethods[0]
@@ -157,7 +169,7 @@ describe("PaymentController API", () => {
       });
 
       const response = await request(app)
-        .post("/payments/methods/mpesa-kenya")
+        .post("/payments/payment-methods/methods/mpesakenya")
         .send({
           phoneNumber: "254712345678",
           isDefault: true,
@@ -178,7 +190,7 @@ describe("PaymentController API", () => {
       });
 
       const response = await request(app)
-        .post("/payments/methods/mpesa-kenya")
+        .post("/payments/payment-methods/methods/mpesakenya")
         .send({
           phoneNumber: "254712345678",
         });
@@ -186,27 +198,29 @@ describe("PaymentController API", () => {
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe(
-        "This phone number is already registered"
+        `This ${mockSupportedMethods[0].displayName} account is already registered`
       );
     });
 
     it("should return 400 for invalid input data", async () => {
       const response = await request(app)
-        .post("/payments/methods/mpesa-kenya")
+        .post("/payments/payment-methods/methods/mpesakenya")
         .send({ phoneNumber: 123456 });
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain("expected string");
+      expect(response.body.error).toContain("Expected string");
     });
   });
 
-  describe("GET /payments/methods/:methodName", () => {
+  describe("GET /payments/payment-methods/methods/:methodName", () => {
     it("should return M-Pesa accounts for a user", async () => {
       mockPrisma.mPesaKenya.findMany.mockResolvedValue([
         { id: "upm1", phoneNumber: "254700000000" },
       ]);
-      const response = await request(app).get("/payments/methods/mpesa-kenya");
+      const response = await request(app).get(
+        "/payments/payment-methods/methods/mpesakenya"
+      );
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.length).toBe(1);
@@ -214,7 +228,7 @@ describe("PaymentController API", () => {
 
     it("should return 400 for an unsupported method", async () => {
       const response = await request(app).get(
-        "/payments/methods/unsupported-method"
+        "/payments/payment-methods/methods/unsupported-method"
       );
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
@@ -224,7 +238,7 @@ describe("PaymentController API", () => {
     });
   });
 
-  describe("PUT /payments/methods/:paymentMethodId", () => {
+  describe("PUT /payments/payment-methods/methods/:paymentMethodId", () => {
     it("should update phone number and isDefault status", async () => {
       const paymentMethod = {
         id: "upm1",
@@ -248,7 +262,7 @@ describe("PaymentController API", () => {
       });
 
       const response = await request(app)
-        .put("/payments/methods/upm1")
+        .put("/payments/payment-methods/methods/upm1")
         .send({ phoneNumber: "254798765432", isDefault: true });
 
       expect(response.status).toBe(200);
@@ -259,7 +273,7 @@ describe("PaymentController API", () => {
     it("should return 400 for payment method not found", async () => {
       mockPrisma.userPaymentMethod.findFirst.mockResolvedValue(null);
       const response = await request(app)
-        .put("/payments/methods/non-existent-id")
+        .put("/payments/payment-methods/methods/non-existent-id")
         .send({ isDefault: true });
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
@@ -267,63 +281,33 @@ describe("PaymentController API", () => {
     });
   });
 
-  describe("DELETE /payments/methods/:paymentMethodId", () => {
-    it("should successfully delete a payment method", async () => {
-      mockPrisma.userPaymentMethod.findFirst.mockResolvedValue({
-        id: "upm1",
-        userId: "user123",
-      });
-      mockPrisma.userPaymentMethod.delete.mockResolvedValue({ id: "upm1" });
-      const response = await request(app).delete("/payments/methods/upm1");
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe("Payment method deleted successfully");
-    });
-
-    it("should return 400 for non-existent payment method", async () => {
-      mockPrisma.userPaymentMethod.findFirst.mockResolvedValue(null);
-      const response = await request(app).delete(
-        "/payments/methods/non-existent-id"
+  describe("GET /payments/payment-methods/currency/:fiatCurrency", () => {
+    it("should return supported methods for a specific currency (KES)", async () => {
+      mockPrisma.supportedPaymentMethod.findMany.mockResolvedValue([
+        mockSupportedMethods[0],
+      ]);
+      const response = await request(app).get(
+        "/payments/payment-methods/currency/kes"
       );
-      expect(response.status).toBe(400);
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe("Payment method not found");
-    });
-  });
-
-  describe("GET /payments/currency/:fiatCurrency", () => {
-    it("should return accounts for a specific currency (KES)", async () => {
-      const mockAccounts = [
-        {
-          id: "upm-kes",
-          userId: "user123",
-          supportedPaymentMethod: mockSupportedMethods[0],
-          mpesaKenya: { id: "upm-kes", phoneNumber: "254700000000" },
-          cbe: null,
-          telebirr: null,
-        },
-      ];
-      mockPrisma.userPaymentMethod.findMany.mockResolvedValue(mockAccounts);
-      const response = await request(app).get("/payments/currency/kes");
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      // Use `expect.arrayContaining` to handle flexible properties
       expect(response.body.data).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            mpesaKenya: expect.objectContaining({
-              phoneNumber: "254700000000",
-            }),
+            currency: FiatCurrency.KES,
+            displayName: "M-Pesa Kenya",
           }),
         ])
       );
     });
 
     it("should return 400 for invalid currency", async () => {
-      const response = await request(app).get("/payments/currency/INVALID");
+      const response = await request(app).get(
+        "/payments/payment-methods/currency/INVALID"
+      );
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe("Invalid currency: INVALID");
+      expect(response.body.error).toBe("Invalid or unsupported currency");
     });
   });
 });

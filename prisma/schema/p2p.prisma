@@ -90,7 +90,7 @@ model FiatCryptoRate {
   paymentMethodProvider             String
   fiatCurrency                      FiatCurrency
   cryptoCurrency                    CryptoCurrency
-  rateType                          RateType
+  adType                            AdType
 
   rawRate                           Decimal      @db.Decimal(18, 8)
   volumeAvailable                   Decimal      @db.Decimal(36, 18)
@@ -109,7 +109,7 @@ model FiatCryptoRate {
   ads                               Ad[]
   
 
-  @@index([fiatCurrency, cryptoCurrency, rateType])
+  @@index([fiatCurrency, cryptoCurrency, adType])
 }
 
  
@@ -140,3 +140,18 @@ model Dispute {
 }
 
  
+ model PricingConfig {
+  id                    String   @id @default(uuid())
+  corridor              String   // e.g., "USD-ETB", "USD-SSP"
+  adType                AdType   
+  margin                Decimal  
+  minMargin             Decimal? 
+  maxMargin             Decimal? 
+  isActive              Boolean  @default(true)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([corridor, adType])
+  @@map("pricing_configs")
+}

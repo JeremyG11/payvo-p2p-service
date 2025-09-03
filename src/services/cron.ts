@@ -2,13 +2,19 @@ import cron, { ScheduledTask } from 'node-cron';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { AdStatus } from '@prisma/client';
+import { fetchAndStoreAllBinanceRates } from './rates';
 
 export class RateCleanupService {
   private cleanupTask: ScheduledTask | null = null;
-  private isRunning: boolean = false;
+  private binanceFetchTask: ScheduledTask | null = null;
+  private isCleanupRunning: boolean = false;
+  private isBinanceFetchRunning: boolean = false;
 
   constructor() {}
 
+  /**
+   * Clean up expired rates and update associated ads to INACTIVE status
+   */
   public async cleanupExpiredRates(): Promise<{
     updatedAdsCount: number;
     deletedRatesCount: number;
@@ -19,6 +25,7 @@ export class RateCleanupService {
           expiresAt: {
             lte: new Date(),
           },
+          isActive: true, // Only consider active rates
         },
         select: {
           id: true,
@@ -32,6 +39,7 @@ export class RateCleanupService {
         return { updatedAdsCount: 0, deletedRatesCount: 0 };
       }
 
+      // Update ads linked to expired rates to INACTIVE status
       const updatedAdsCountResult = await prisma.ad.updateMany({
         where: {
           fiatCryptoRateId: {
@@ -51,6 +59,7 @@ export class RateCleanupService {
         `Updated ${updatedAdsCountResult.count} ads to INACTIVE status`
       );
 
+      // Delete the expired rates
       const deletedRatesCountResult = await prisma.fiatCryptoRate.deleteMany({
         where: {
           id: {
@@ -71,6 +80,41 @@ export class RateCleanupService {
     }
   }
 
+  /**
+   * Fetch Binance rates
+   */
+  private async fetchBinanceRates(): Promise<void> {
+    if (this.isBinanceFetchRunning) {
+      logger.debug('Binance rate fetch already in progress, skipping');
+      return;
+    }
+
+    this.isBinanceFetchRunning = true;
+    try {
+      logger.debug('Starting Binance rate fetch');
+      await fetchAndStoreAllBinanceRates();
+      logger.debug('Completed Binance rate fetch');
+    } catch (error) {
+      logger.error('Error in Binance rate fetch:', error);
+    } finally {
+      this.isBinanceFetchRunning = false;
+    }
+  }
+
+  /**
+   * Schedule both rate cleanup and Binance rate fetch tasks
+   */
+  public scheduleAllTasks(): void {
+    // Schedule rate cleanup every 5 minutes
+    this.scheduleRateCleanup('*/5 * * * *');
+
+    // Schedule Binance rate fetch every 2 minutes
+    this.scheduleBinanceRateFetch('*/2 * * * *');
+  }
+
+  /**
+   * Schedule the rate cleanup task
+   */
   public scheduleRateCleanup(
     cronExpression: string = '*/5 * * * *'
   ): ScheduledTask {
@@ -81,12 +125,12 @@ export class RateCleanupService {
     this.cleanupTask = cron.schedule(
       cronExpression,
       async () => {
-        if (this.isRunning) {
+        if (this.isCleanupRunning) {
           logger.debug('Rate cleanup already in progress, skipping');
           return;
         }
 
-        this.isRunning = true;
+        this.isCleanupRunning = true;
         try {
           logger.debug('Starting scheduled rate cleanup');
           await this.cleanupExpiredRates();
@@ -94,7 +138,7 @@ export class RateCleanupService {
         } catch (error) {
           logger.error('Error in scheduled rate cleanup:', error);
         } finally {
-          this.isRunning = false;
+          this.isCleanupRunning = false;
         }
       },
       {
@@ -106,6 +150,35 @@ export class RateCleanupService {
     return this.cleanupTask;
   }
 
+  /**
+   * Schedule the Binance rate fetch task
+   */
+  public scheduleBinanceRateFetch(
+    cronExpression: string = '*/2 * * * *'
+  ): ScheduledTask {
+    if (this.binanceFetchTask) {
+      this.stopBinanceRateFetch();
+    }
+
+    this.binanceFetchTask = cron.schedule(
+      cronExpression,
+      async () => {
+        await this.fetchBinanceRates();
+      },
+      {
+        timezone: 'UTC',
+      }
+    );
+
+    logger.info(
+      `Binance rate fetch scheduled with expression: ${cronExpression}`
+    );
+    return this.binanceFetchTask;
+  }
+
+  /**
+   * Stop the rate cleanup task
+   */
   public stopRateCleanup(): void {
     if (this.cleanupTask) {
       this.cleanupTask.stop();
@@ -114,10 +187,42 @@ export class RateCleanupService {
     }
   }
 
-  public isCleanupRunning(): boolean {
-    return this.isRunning;
+  /**
+   * Stop the Binance rate fetch task
+   */
+  public stopBinanceRateFetch(): void {
+    if (this.binanceFetchTask) {
+      this.binanceFetchTask.stop();
+      this.binanceFetchTask = null;
+      logger.info('Binance rate fetch task stopped');
+    }
   }
 
+  /**
+   * Stop all scheduled tasks
+   */
+  public stopAllTasks(): void {
+    this.stopRateCleanup();
+    this.stopBinanceRateFetch();
+  }
+
+  /**
+   * Check if the cleanup task is running
+   */
+  public getIsCleanupRunning(): boolean {
+    return this.isCleanupRunning;
+  }
+
+  /**
+   * Check if the Binance fetch task is running
+   */
+  public getIsBinanceFetchRunning(): boolean {
+    return this.isBinanceFetchRunning;
+  }
+
+  /**
+   * Manual trigger for cleanup (useful for testing or admin operations)
+   */
   public async manualCleanup(): Promise<{
     updatedAdsCount: number;
     deletedRatesCount: number;
@@ -125,8 +230,17 @@ export class RateCleanupService {
     logger.info('Manual rate cleanup triggered');
     return this.cleanupExpiredRates();
   }
+
+  /**
+   * Manual trigger for Binance rate fetch
+   */
+  public async manualBinanceFetch(): Promise<void> {
+    logger.info('Manual Binance rate fetch triggered');
+    return this.fetchBinanceRates();
+  }
 }
 
+// Create and export a singleton instance
 let rateCleanupServiceInstance: RateCleanupService | null = null;
 
 export function getRateCleanupService(): RateCleanupService {

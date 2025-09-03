@@ -1,15 +1,15 @@
-import {
-  BadRequestError,
-  UnauthenticatedError,
-  UnauthorizedError,
-} from "@/lib/error";
-import { asyncWrapper } from "@/middlewares/error";
+import { BadRequestError, UnauthenticatedError } from '@/lib/error';
+import { authenticate } from '@/middlewares/authenticate';
+import { authorize } from '@/middlewares/authorize';
+import { asyncWrapper } from '@/middlewares/error';
+import validator from '@/middlewares/validator';
+import { QueryParamsSchema } from '@/schema';
 
 import {
   AddCbePaymentMethodSchema,
   AddMPesaKenyaSchema,
   AddTeleBirrSchema,
-} from "@/schema";
+} from '@/schema/payment-methods';
 import {
   Prisma,
   PrismaClient,
@@ -20,9 +20,9 @@ import {
   UserPaymentMethod,
   SupportedPaymentMethod,
   PaymentMethodCategory,
-} from "@prisma/client";
+} from '@prisma/client';
 
-import { Router, Request, Response } from "express";
+import { Router, Request, Response } from 'express';
 
 /**
  * Interface for a standardized API response.
@@ -94,7 +94,7 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
 
     if (!validatedData.success) {
       throw new BadRequestError(
-        validatedData.error.issues.map((issue) => issue.message).join(", ")
+        validatedData.error.issues.map((issue) => issue.message).join(', ')
       );
     }
     const { phoneNumber } = validatedData.data;
@@ -109,7 +109,7 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
     });
 
     if (!supportedMethod) {
-      throw new BadRequestError("MPesa Kenya is not currently supported");
+      throw new BadRequestError('MPesa Kenya is not currently supported');
     }
 
     const existingAccount = await this.prisma.mPesaKenya.findUnique({
@@ -189,9 +189,7 @@ class CBEHandler extends PaymentMethodHandler {
     const validatedData = AddCbePaymentMethodSchema.safeParse(req.body);
 
     if (!validatedData.success) {
-      throw new BadRequestError(
-        validatedData.error.issues.map((issue) => issue.message).join(", ")
-      );
+      throw new BadRequestError('Invalid input data');
     }
     const { isDefault, accountNumber, accountName } = validatedData.data;
 
@@ -204,7 +202,7 @@ class CBEHandler extends PaymentMethodHandler {
     });
 
     if (!supportedMethod) {
-      throw new BadRequestError("CBE is not currently supported");
+      throw new BadRequestError('CBE is not currently supported');
     }
 
     const existingAccount = await this.prisma.cbe.findUnique({
@@ -212,7 +210,7 @@ class CBEHandler extends PaymentMethodHandler {
     });
 
     if (existingAccount) {
-      throw new BadRequestError("This account number is already registered");
+      throw new BadRequestError('This account number is already registered');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -264,7 +262,7 @@ class CBEHandler extends PaymentMethodHandler {
         where: { accountNumber },
       });
       if (existingAccount && existingAccount.id !== accountId) {
-        throw new BadRequestError("This account number is already registered");
+        throw new BadRequestError('This account number is already registered');
       }
       updateData.accountNumber = accountNumber;
     }
@@ -289,7 +287,7 @@ class TeleBirrHandler extends PaymentMethodHandler {
 
     if (!validatedData.success) {
       throw new BadRequestError(
-        validatedData.error.issues.map((issue) => issue.message).join(", ")
+        validatedData.error.issues.map((issue) => issue.message).join(', ')
       );
     }
     const { phoneNumber } = validatedData.data;
@@ -305,7 +303,7 @@ class TeleBirrHandler extends PaymentMethodHandler {
     });
 
     if (!supportedMethod) {
-      throw new BadRequestError("TeleBirr is not currently supported");
+      throw new BadRequestError('TeleBirr is not currently supported');
     }
 
     const existingAccount = await this.prisma.teleBirr.findUnique({
@@ -396,9 +394,9 @@ export class PaymentController {
   constructor(prismaClient: PrismaClient) {
     this.prisma = prismaClient;
     this.handlers = new Map();
-    this.handlers.set("mpesakenya", new MPesaKenyaHandler(prismaClient));
-    this.handlers.set("cbe", new CBEHandler(prismaClient));
-    this.handlers.set("telebirr", new TeleBirrHandler(prismaClient));
+    this.handlers.set('mpesakenya', new MPesaKenyaHandler(prismaClient));
+    this.handlers.set('cbe', new CBEHandler(prismaClient));
+    this.handlers.set('telebirr', new TeleBirrHandler(prismaClient));
   }
 
   /**
@@ -410,7 +408,7 @@ export class PaymentController {
   private getUserId(req: AuthenticatedRequest): string {
     const userId = req.userId;
     if (!userId) {
-      throw new UnauthenticatedError("Authentication required");
+      throw new UnauthenticatedError('Authentication required');
     }
     return userId;
   }
@@ -442,37 +440,6 @@ export class PaymentController {
   }
 
   /**
-   * Sends a standardized error response.
-   * @param {Response} res The Express response object.
-   * @param {unknown} error The error object.
-   * @param {string} context The context of the error (e.g., method name).
-   */
-  private sendError(res: Response, error: unknown, context: string): void {
-    console.error(`${context} error:`, error);
-    let statusCode = 500;
-    let errorMessage = "Internal server error";
-
-    if (error instanceof UnauthenticatedError) {
-      statusCode = 401;
-      errorMessage = error.message;
-    } else if (error instanceof UnauthorizedError) {
-      statusCode = 403;
-      errorMessage = error.message;
-    } else if (error instanceof BadRequestError) {
-      statusCode = 400;
-      errorMessage = error.message;
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-
-    const response: ApiResponse = {
-      success: false,
-      error: errorMessage,
-    };
-    res.status(statusCode).json(response);
-  }
-
-  /**
    * Gets all supported payment methods.
    * @param {Request} req The Express request object.
    * @param {Response} res The Express response object.
@@ -485,7 +452,7 @@ export class PaymentController {
       this.getUserId(req);
       const methods: Pick<
         SupportedPaymentMethod,
-        "id" | "currency" | "displayName"
+        'id' | 'currency' | 'displayName'
       >[] = await this.prisma.supportedPaymentMethod.findMany({
         where: { isActive: true },
         select: {
@@ -498,10 +465,10 @@ export class PaymentController {
       this.sendSuccess(
         res,
         methods,
-        "Supported payment methods retrieved successfully"
+        'Supported payment methods retrieved successfully'
       );
     } catch (error) {
-      this.sendError(res, error, "getAllSupportedPaymentMethods");
+      throw error;
     }
   }
 
@@ -522,7 +489,7 @@ export class PaymentController {
         `${methodName} account added successfully`
       );
     } catch (error) {
-      this.sendError(res, error, "addPaymentMethod");
+      throw error;
     }
   }
 
@@ -543,16 +510,16 @@ export class PaymentController {
         `${methodName} accounts retrieved successfully`
       );
     } catch (error) {
-      this.sendError(res, error, "getPaymentMethods");
+      throw error;
     }
   }
 
   /**
-   * Retrieves a user's payment methods filtered by currency.
+   * Retrieves supported payment methods filtered by currency.
    * @param {Request} req The Express request object.
    * @param {Response} res The Express response object.
    */
-  async getPaymentMethodsByCurrency(
+  async getSupportedPaymentMethodsByCurrency(
     req: Request,
     res: Response
   ): Promise<void> {
@@ -563,29 +530,25 @@ export class PaymentController {
       const currency = fiatCurrency.toUpperCase() as FiatCurrency;
 
       if (!Object.values(FiatCurrency).includes(currency)) {
-        throw new BadRequestError(`Invalid currency: ${fiatCurrency}`);
+        throw new BadRequestError(
+          `Invalid or Unsupported currency: ${fiatCurrency}`
+        );
       }
 
-      const accounts: UserPaymentMethodDetails[] =
-        await this.prisma.userPaymentMethod.findMany({
-          where: {
-            userId,
-            supportedPaymentMethod: {
-              currency,
-              isActive: true,
-            },
-          },
-          include: {
-            supportedPaymentMethod: true,
-            mpesaKenya: true,
-            cbe: true,
-            telebirr: true,
-          },
-        });
+      const paymentMethods = await this.prisma.supportedPaymentMethod.findMany({
+        where: {
+          currency,
+          isActive: true,
+        },
+      });
 
-      this.sendSuccess(res, accounts, "Payment methods retrieved successfully");
+      this.sendSuccess(
+        res,
+        paymentMethods,
+        'Payment methods retrieved successfully'
+      );
     } catch (error) {
-      this.sendError(res, error, "getPaymentMethodsByCurrency");
+      throw error;
     }
   }
 
@@ -595,14 +558,14 @@ export class PaymentController {
    * @param {Response} res The Express response object.
    */
 
-  async getPaymentMethodsByUser(req: Request, res: Response): Promise<void> {
+  async getUserPaymentMethods(req: Request, res: Response): Promise<void> {
     try {
       this.getUserId(req);
 
       const { userId } = req.params;
 
       if (!userId) {
-        throw new BadRequestError("User ID is required");
+        throw new BadRequestError('User ID is required');
       }
 
       // Query for user payment methods and include the supported method type
@@ -642,10 +605,10 @@ export class PaymentController {
       this.sendSuccess(
         res,
         formattedAccounts,
-        "User payment methods retrieved"
+        'User payment methods retrieved'
       );
     } catch (error) {
-      this.sendError(res, error, "getPaymentMethodsByUser");
+      throw error;
     }
   }
   /**
@@ -656,6 +619,7 @@ export class PaymentController {
   async updatePaymentMethod(req: Request, res: Response): Promise<void> {
     try {
       const userId = this.getUserId(req);
+
       const { paymentMethodId } = req.params;
       const { isDefault, ...details } = req.body;
 
@@ -671,30 +635,30 @@ export class PaymentController {
         });
 
       if (!paymentMethod) {
-        throw new BadRequestError("Payment method not found");
+        throw new BadRequestError('Payment method not found');
       }
 
       await this.prisma.$transaction(async (tx) => {
         if (Object.keys(details).length > 0) {
           if (paymentMethod.mpesaKenya) {
-            await this.getHandler("mpesakenya").updateAccount(
+            await this.getHandler('mpesakenya').updateAccount(
               paymentMethodId,
               details as Partial<MPesaKenya>
             );
           } else if (paymentMethod.cbe) {
-            await this.getHandler("cbe").updateAccount(
+            await this.getHandler('cbe').updateAccount(
               paymentMethodId,
               details as Partial<Cbe>
             );
           } else if (paymentMethod.telebirr) {
-            await this.getHandler("telebirr").updateAccount(
+            await this.getHandler('telebirr').updateAccount(
               paymentMethodId,
               details as Partial<TeleBirr>
             );
           }
         }
 
-        if (typeof isDefault === "boolean") {
+        if (typeof isDefault === 'boolean') {
           if (isDefault) {
             await tx.userPaymentMethod.updateMany({
               where: { userId, isDefault: true },
@@ -708,9 +672,9 @@ export class PaymentController {
         }
       });
 
-      this.sendSuccess(res, null, "Payment method updated successfully");
+      this.sendSuccess(res, null, 'Payment method updated successfully');
     } catch (error) {
-      this.sendError(res, error, "updatePaymentMethod");
+      throw error;
     }
   }
 
@@ -729,16 +693,16 @@ export class PaymentController {
       });
 
       if (!paymentMethod) {
-        throw new BadRequestError("Payment method not found");
+        throw new BadRequestError('Payment method not found');
       }
 
       await this.prisma.userPaymentMethod.delete({
         where: { id: paymentMethodId },
       });
 
-      this.sendSuccess(res, null, "Payment method deleted successfully");
+      this.sendSuccess(res, null, 'Payment method deleted successfully');
     } catch (error) {
-      this.sendError(res, error, "deletePaymentMethod");
+      throw error;
     }
   }
 
@@ -748,36 +712,43 @@ export class PaymentController {
    */
   routes(): Router {
     const router = Router();
-
     router.get(
-      "/",
+      '/',
       asyncWrapper(this.getAllSupportedPaymentMethods.bind(this))
     );
 
     router.post(
-      "/methods/:methodName",
+      '/methods/:methodName',
       asyncWrapper(this.addPaymentMethod.bind(this))
     );
     router.get(
-      "/methods/:methodName",
+      '/methods/:methodName',
       asyncWrapper(this.getPaymentMethods.bind(this))
     );
 
     router.get(
-      "/users/:userId/methods",
-      asyncWrapper(this.getPaymentMethodsByUser.bind(this))
+      '/users/:userId/methods',
+      authenticate,
+      asyncWrapper(this.getUserPaymentMethods.bind(this))
     );
 
     router.get(
-      "/currency/:fiatCurrency",
-      asyncWrapper(this.getPaymentMethodsByCurrency.bind(this))
+      '/currency/:fiatCurrency',
+      asyncWrapper(this.getSupportedPaymentMethodsByCurrency.bind(this))
     );
     router.put(
-      "/methods/:paymentMethodId",
+      '/methods/:paymentMethodId',
+      validator(QueryParamsSchema, 'params'),
+      authenticate,
+      authorize({ requiredPermissions: ['payment:methods:update'] }),
       asyncWrapper(this.updatePaymentMethod.bind(this))
     );
+
     router.delete(
-      "/methods/:paymentMethodId",
+      '/methods/:paymentMethodId',
+      validator(QueryParamsSchema, 'params'),
+      authenticate,
+      authorize({ requiredPermissions: ['payment:methods:delete'] }),
       asyncWrapper(this.deletePaymentMethod.bind(this))
     );
 

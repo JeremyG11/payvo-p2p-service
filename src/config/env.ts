@@ -7,6 +7,16 @@ export const config = {
   port: process.env.PORT || 5006,
   serviceName: process.env.SERVICE_NAME,
 
+  // p2p configs
+  rates: {
+    inboundMargin: process.env.INBOUND_MARGIN,
+    outboundMargin: process.env.OUTBOUND_MARGIN,
+    minVolumeThreshold: process.env.MIN_VOLUME_THRESHOLD,
+    maxRateDeviation: process.env.MAX_RATE_DEVIATION,
+    dbQueryRecencyMinutes: process.env.DB_QUERY_RECENCY_MINUTES,
+    topAdsConsidered: process.env.BINANCE_TOP_ADS,
+  },
+
   // crypto
   jwtPublicKey: process.env.JWT_PUBLIC_KEY,
 

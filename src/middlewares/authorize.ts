@@ -94,6 +94,9 @@ export const authorize = (options: AuthorizeOptions = {}) => {
         return;
       }
 
+      console.log('User Permissions:', req.userPermissions);
+      console.log('Required Permissions:', requiredPermissions);
+
       const hasAllRequiredPermissions = requiredPermissions.every(
         (permission) => req.userPermissions.includes(permission)
       );

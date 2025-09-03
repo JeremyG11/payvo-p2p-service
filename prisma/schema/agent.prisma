@@ -1,0 +1,16 @@
+model Balance {
+  id                String   @id @default(cuid())
+  userId            String   
+  currency          FiatCurrency  
+  available         Decimal   
+  locked            Decimal  
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  agent              Agent @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, currency])
+  @@map("balances")
+}

@@ -32,7 +32,7 @@ enum CryptoCurrency {
   USDT
 }
 
-enum RateType {
+enum AdType {
   BUY
   SELL
 }

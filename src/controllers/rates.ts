@@ -1,5 +1,5 @@
 import { Request, Response, Router } from 'express';
-import { FiatCurrency, PrismaClient, RateType } from '@prisma/client';
+import { FiatCurrency, PrismaClient, AdType } from '@prisma/client';
 import {
   BadRequestError,
   InternalServerError,
@@ -81,7 +81,7 @@ export class RateController {
         where: {
           fiatCurrency,
           supportedPaymentMethodId: paymentMethodId,
-          rateType: RateType.BUY,
+          adType: AdType.BUY,
         },
         orderBy: [{ rawRate: 'asc' }, { fetchedAt: 'desc' }],
       }),
@@ -89,7 +89,7 @@ export class RateController {
         where: {
           fiatCurrency,
           supportedPaymentMethodId: paymentMethodId,
-          rateType: RateType.SELL,
+          adType: AdType.SELL,
         },
         orderBy: [{ rawRate: 'desc' }, { fetchedAt: 'desc' }],
       }),
