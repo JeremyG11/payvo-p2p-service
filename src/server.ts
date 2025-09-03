@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { initRedis, shutdownRedis } from '@/config/radis';
 import kafkaInit, { disconnectKafka } from '@/config/kafka';
 import { blacklistService } from '@/services/cache/blacklist-cache';
-import { scheduleRateCleanup } from '@/services/cron';
+import { rateCleanupService } from '@/services/cron';
 
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = Number(config.port) || 5006;
@@ -27,8 +27,9 @@ async function startServer() {
     await bootstrap();
 
     logger.info('Starting scheduled tasks…');
-    const ratesCrons = scheduleRateCleanup();
-    ratesCrons.start();
+
+    // Start the cron task using the service instance
+    const cleanupTask = rateCleanupService.scheduleRateCleanup();
 
     const server = http.createServer(app);
     server.listen(PORT, HOST, () => {
@@ -52,8 +53,9 @@ async function startServer() {
       await disconnectKafka();
       await shutdownRedis();
 
-      // close scheduled tasks
-      ratesCrons.stop();
+      // Stop the scheduled task correctly
+      rateCleanupService.stopRateCleanup();
+
       process.exit(0);
     };
 
