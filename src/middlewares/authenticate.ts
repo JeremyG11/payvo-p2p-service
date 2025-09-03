@@ -4,7 +4,7 @@ import { verifyJwt } from '@/lib/jwt';
 import { CachedAuthData } from '@/types';
 import { UserCacheFields } from '@/lib/cache-keys';
 import { Request, Response, NextFunction } from 'express';
-import { fetchUserPermissions } from '@/services/fetch-user';
+import { fetchUserPermissions } from '@/services/user/fetch-user';
 import { blacklistService } from '@/services/cache/blacklist-cache';
 import { userCacheService } from '@/services/cache';
 

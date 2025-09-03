@@ -239,12 +239,10 @@ export class AdsService {
       return updatedAd;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
-        // P2025 is Prisma's error code for a record not being found
         if (e.code === 'P2025') {
           throw new NotFoundError('Ad not found.');
         }
       }
-      // Re-throw any other errors
       throw e;
     }
   }
