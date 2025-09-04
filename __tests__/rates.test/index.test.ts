@@ -305,7 +305,7 @@ describe("RateService", () => {
 
       // Mock a stale cached value
       const cachedRate = {
-        rate: "99.5", 
+        rate: "99.5",
         source: "market",
         calculatedAt: new Date().toISOString(),
         adsConsidered: 1,
@@ -401,9 +401,7 @@ describe("RateService", () => {
         FiatCurrency.USD
       );
 
-      console.log(result);
-
-      // result.rate should be a Decimal object after parsing
+      // result should be a parsed object, and its rate property a string
       expect(result.rate.toString()).toBe("100.5");
       expect(redisCacheServiceMock.set).not.toHaveBeenCalled();
     });

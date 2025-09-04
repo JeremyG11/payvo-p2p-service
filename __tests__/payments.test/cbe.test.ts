@@ -1,190 +1,206 @@
-import request from "supertest";
 import { describe, it, beforeEach, expect, vi } from "vitest";
-import { PaymentMethodCategory, FiatCurrency } from "@prisma/client";
-import express, { Request, Application, Response, NextFunction } from "express";
-import { PaymentController } from "../../src/controllers/payments";
+import {
+  PrismaClient,
+  PaymentMethodCategory,
+  FiatCurrency,
+  SupportedPaymentMethod,
+} from "@prisma/client";
+import { CBEHandler } from "../../src/controllers/payments/cbe";
+import { BadRequestError } from "../../src/lib/error";
+import { Request } from "express";
 
-// Extend the Express Request interface for our tests
-declare global {
-  namespace Express {
-    interface Request {
-      userId?: string;
-    }
-  }
-}
+// A valid UUID to use for testing
+const mockPaymentMethodId = "b1b2a3a4-4c6e-4f7d-a1b2-1c2d3e4f5a6b";
 
-// Mock Prisma client with all necessary methods
-const mockPrisma = {
-  supportedPaymentMethod: {
-    findFirst: vi.fn(),
-  },
-  userPaymentMethod: {
-    updateMany: vi.fn(),
-    create: vi.fn(),
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    delete: vi.fn(),
-    update: vi.fn(),
-  },
-  cbe: {
-    findMany: vi.fn(),
-    findUnique: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-  telebirr: {
-    findMany: vi.fn(),
-  },
-  mPesaKenya: {
-    findMany: vi.fn(),
-  },
-  $transaction: vi.fn(async (callback) => await callback(mockPrisma)),
+// Mocked data for supported payment methods
+const mockSupportedMethod: SupportedPaymentMethod = {
+  id: "sup-cbe",
+  provider: "CBE",
+  displayName: "Commercial Bank of Ethiopia",
+  category: PaymentMethodCategory.BANK_TRANSFER,
+  currency: FiatCurrency.ETB,
+  isActive: true,
+  logoUrl: "url/cbe.png",
+  createdAt: new Date(),
+  updatedAt: new Date(),
 };
 
-// Instantiate controller with mock
-const paymentController = new PaymentController(mockPrisma as any);
+// Create a mock for each Prisma model to be used in the test
+const mockCbe = {
+  findUnique: vi.fn(),
+  findMany: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+};
 
-// Setup Express App
-const app: Application = express();
-app.use(express.json());
-app.use((req: Request, res: Response, next: NextFunction) => {
-  req.userId = "test-user-id";
-  next();
-});
-app.use(
-  "/payments/payment-methods",
-  (req, _res, next) => {
-    req.userId = "test-user-id";
-    next();
-  },
-  paymentController.routes()
-);
+const mockUserPaymentMethod = {
+  updateMany: vi.fn(),
+  create: vi.fn(),
+};
 
-describe("PaymentController API — CBE endpoints", () => {
+const mockSupportedPaymentMethod = {
+  findFirst: vi.fn(),
+};
+
+// Create the main Prisma client mock object, assigning the mock models
+const mockPrisma = {
+  cbe: mockCbe,
+  userPaymentMethod: mockUserPaymentMethod,
+  supportedPaymentMethod: mockSupportedPaymentMethod,
+  $transaction: vi.fn(async (callback) => {
+    return callback(mockPrisma);
+  }),
+};
+
+// Instantiate handler with mock
+const cbeHandler = new CBEHandler(mockPrisma as unknown as PrismaClient);
+
+describe("CBEHandler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  //  GET /payment-methods/methods/cbe
-  it("should return 200 and an array of CBE accounts", async () => {
-    mockPrisma.cbe.findMany.mockResolvedValue([
-      { id: "cbe1", accountNumber: "1234567890111" },
-    ]);
-    const res = await request(app).get("/payments/payment-methods/methods/cbe");
-
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(Array.isArray(res.body.data)).toBe(true);
-    expect(res.body.data[0].accountNumber).toBe("1234567890111");
-  });
-
-  //  POST /payment-methods/methods/cbe
-  it("should create a new CBE account", async () => {
-    const mockSupportedMethod = {
-      id: "sup-cbe",
-      type: PaymentMethodCategory.BANK_TRANSFER,
-      method: "Commercial Bank of Ethiopia",
-      currency: FiatCurrency.ETB,
-      isActive: true,
-      logo: "url/cbe.png",
-    };
-    mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue(
-      mockSupportedMethod
-    );
-    mockPrisma.cbe.findUnique.mockResolvedValue(null);
-    mockPrisma.userPaymentMethod.updateMany.mockResolvedValue({});
-    mockPrisma.userPaymentMethod.create.mockResolvedValue({
-      id: "upm-cbe-1",
-      userId: "test-user-id",
-      supportedPaymentMethodId: "sup-cbe",
-      isDefault: true,
-    });
-    const newAccount = {
-      id: "upm-cbe-1",
-      accountNumber: "1234567890111",
-      accountName: "John Doe",
-    };
-    mockPrisma.cbe.create.mockResolvedValue(newAccount);
-
-    const res = await request(app)
-      .post("/payments/payment-methods/methods/cbe")
-      .send({
-        accountNumber: "1234567890111",
-        accountName: "John Doe",
-        isDefault: true,
+  describe("addAccount", () => {
+    it("should successfully add a new CBE account", async () => {
+      mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue(
+        mockSupportedMethod
+      );
+      mockPrisma.cbe.findUnique.mockResolvedValue(null);
+      mockPrisma.userPaymentMethod.updateMany.mockResolvedValue({});
+      mockPrisma.userPaymentMethod.create.mockResolvedValue({
+        id: mockPaymentMethodId,
+      });
+      mockPrisma.cbe.create.mockResolvedValue({
+        id: mockPaymentMethodId,
+        accountNumber: "1000200030004",
       });
 
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data).toEqual(
-      expect.objectContaining({
-        accountNumber: "1234567890111",
-        accountName: "John Doe",
-      })
-    );
-    expect(res.body.message).toBe("cbe account added successfully");
-  });
+      const mockRequest = {
+        body: {
+          accountNumber: "1000200030004",
+          isDefault: true,
+          accountName: "My CBE Account",
+        },
+      } as Request;
+      const result = await cbeHandler.addAccount(mockRequest, "user123");
 
-  //  POST /payments/payment-methods/methods/cbe - Error Cases
-  it("should return 400 if accountNumber is missing", async () => {
-    const res = await request(app)
-      .post("/payments/payment-methods/methods/cbe")
-      .send({ accountName: "John Doe" });
-
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toBe("Invalid input data");
-  });
-
-  it("should return 400 for duplicate account number", async () => {
-    // Mock the supported payment method lookup
-    mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue({
-      id: "sup-cbe",
-      type: PaymentMethodCategory.BANK_TRANSFER,
-      method: "Commercial Bank of Ethiopia",
-      currency: FiatCurrency.ETB,
-      isActive: true,
-      logo: "url/cbe.png",
+      expect(result.accountNumber).toBe("1000200030004");
+      expect(mockPrisma.supportedPaymentMethod.findFirst).toHaveBeenCalled();
+      expect(mockPrisma.cbe.findUnique).toHaveBeenCalledWith({
+        where: { accountNumber: "1000200030004" },
+      });
+      expect(mockPrisma.userPaymentMethod.updateMany).toHaveBeenCalledWith({
+        where: { userId: "user123", isDefault: true },
+        data: { isDefault: false },
+      });
+      expect(mockPrisma.userPaymentMethod.create).toHaveBeenCalledWith(
+        expect.any(Object)
+      );
+      expect(mockPrisma.cbe.create).toHaveBeenCalledWith(expect.any(Object));
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
 
-    mockPrisma.cbe.findUnique
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: "existing-id",
-        accountNumber: "1234567890111",
-        accountName: "Jane Doe",
-        userId: "some-user-id",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+    it("should throw a BadRequestError if CBE is not currently supported", async () => {
+      mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue(null);
+      const mockRequest = {
+        body: {
+          accountNumber: "1000200030004",
+          isDefault: false,
+          accountName: "Test Account",
+        },
+      } as Request;
+
+      await expect(
+        cbeHandler.addAccount(mockRequest, "user123")
+      ).rejects.toThrow(BadRequestError);
+      await expect(
+        cbeHandler.addAccount(mockRequest, "user123")
+      ).rejects.toThrow("CBE is not currently supported");
+    });
+
+    it("should throw a BadRequestError for duplicate account number", async () => {
+      mockPrisma.supportedPaymentMethod.findFirst.mockResolvedValue(
+        mockSupportedMethod
+      );
+      mockPrisma.cbe.findUnique.mockResolvedValue({
+        id: mockPaymentMethodId,
+        accountNumber: "1000200030004",
       });
 
-    const res = await request(app)
-      .post("/payments/payment-methods/methods/cbe")
-      .send({ accountNumber: "1234567890111", accountName: "Jane Doe" });
+      const mockRequest = {
+        body: {
+          accountNumber: "1000200030004",
+          isDefault: false,
+          accountName: "Test Account",
+        },
+      } as Request;
 
-    expect(res.status).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toBe("This account number is already registered");
+      await expect(
+        cbeHandler.addAccount(mockRequest, "user123")
+      ).rejects.toThrow(BadRequestError);
+      await expect(
+        cbeHandler.addAccount(mockRequest, "user123")
+      ).rejects.toThrow("This account number is already registered");
+    });
+
+    it("should throw a BadRequestError for invalid input data", async () => {
+      const mockRequest = { body: { accountNumber: 123456 } } as Request;
+      await expect(
+        cbeHandler.addAccount(mockRequest, "user123")
+      ).rejects.toThrow(BadRequestError);
+    });
   });
 
-  //  Common Error Cases
-  it("should return 401 if user is missing", async () => {
-    const unauthApp = express();
-    unauthApp.use(express.json());
-    unauthApp.use(
-      "/payments/payment-methods",
-      (req, _res, next) => {
-        req.userId = "test-user-id";
-        next();
-      },
-      paymentController.routes()
-    );
-    const res = await request(unauthApp).get(
-      "/payments/payment-methods/methods/cbe"
-    );
+  describe("getAccounts", () => {
+    it("should return CBE accounts for a user", async () => {
+      const mockAccounts = [
+        { id: mockPaymentMethodId, accountNumber: "1000200030004" },
+      ];
+      mockPrisma.cbe.findMany.mockResolvedValue(mockAccounts);
+      const result = await cbeHandler.getAccounts("user123");
 
-    expect(res.status).toBe(401);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toBe("Authentication required");
+      expect(result).toEqual(mockAccounts);
+      expect(mockPrisma.cbe.findMany).toHaveBeenCalledWith({
+        where: { userPaymentMethod: { userId: "user123" } },
+        include: {
+          userPaymentMethod: { include: { supportedPaymentMethod: true } },
+        },
+      });
+    });
+  });
+
+  describe("updateAccount", () => {
+    it("should update phone number for an existing CBE account", async () => {
+      mockPrisma.cbe.findUnique.mockResolvedValue(null);
+      mockPrisma.cbe.update.mockResolvedValue({
+        id: mockPaymentMethodId,
+        accountNumber: "1000200030005",
+      });
+
+      const updatedAccount = await cbeHandler.updateAccount(
+        mockPaymentMethodId,
+        { accountNumber: "1000200030005" }
+      );
+
+      expect(updatedAccount?.accountNumber).toBe("1000200030005");
+      expect(mockPrisma.cbe.update).toHaveBeenCalledWith({
+        where: { id: mockPaymentMethodId },
+        data: { accountNumber: "1000200030005" },
+      });
+    });
+
+    it("should throw a BadRequestError if updating to a duplicate account number", async () => {
+      mockPrisma.cbe.findUnique.mockResolvedValue({
+        id: "another-id",
+        accountNumber: "1000200030005",
+        displayName: "My CBE Account",
+      });
+
+      await expect(
+        cbeHandler.updateAccount(mockPaymentMethodId, {
+          accountNumber: "1000200030005",
+        })
+      ).rejects.toThrow(BadRequestError);
+    });
   });
 });

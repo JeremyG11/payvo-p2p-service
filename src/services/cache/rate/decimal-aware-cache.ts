@@ -1,4 +1,4 @@
-import { ICacheService } from '@/types/cache';
+import { ServiceCacheService } from '@payvo/redis';
 import { Decimal } from '@prisma/client/runtime/library';
 
 /**
@@ -14,7 +14,7 @@ interface IStringCacheService {
  * A utility class to safely serialize and deserialize Decimal objects
  * when working with a cache service that only handles native types.
  */
-export class DecimalAwareCacheService implements ICacheService {
+export class DecimalAwareCacheService {
   /**
    * Constructs the DecimalAwareCacheService, wrapping an underlying cache.
    * @param underlyingCache The base cache service (e.g., a Redis client).
