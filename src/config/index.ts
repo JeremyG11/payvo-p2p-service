@@ -1,4 +1,9 @@
-import { FiatCurrency, PaymentMethodCategory } from '@prisma/client';
+import {
+  AdType,
+  CryptoCurrency,
+  FiatCurrency,
+  PaymentMethodCategory,
+} from '@prisma/client';
 
 interface PaymentMethodConfig {
   provider: string;
@@ -11,7 +16,7 @@ interface CountryConfig {
   paymentMethods: PaymentMethodConfig[];
 }
 
-export const rateConfigs: CountryConfig[] = [
+export const PAYMENT_METHODS_CONFIG: CountryConfig[] = [
   {
     fiatCurrency: FiatCurrency.USD,
     paymentMethods: [
@@ -66,5 +71,28 @@ export const rateConfigs: CountryConfig[] = [
         category: PaymentMethodCategory.BANK_TRANSFER,
       },
     ],
+  },
+];
+
+export const PAIRS_TO_FETCH = [
+  {
+    fiat: FiatCurrency.USD,
+    crypto: CryptoCurrency.USDT,
+    adType: AdType.BUY,
+  },
+  {
+    fiat: FiatCurrency.KES,
+    crypto: CryptoCurrency.USDT,
+    adType: AdType.SELL,
+  },
+  {
+    fiat: FiatCurrency.ETB,
+    crypto: CryptoCurrency.USDT,
+    adType: AdType.SELL,
+  },
+  {
+    fiat: FiatCurrency.UGX,
+    crypto: CryptoCurrency.USDT,
+    adType: AdType.SELL,
   },
 ];

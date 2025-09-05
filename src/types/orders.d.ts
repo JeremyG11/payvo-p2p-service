@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { Decimal } from "@prisma/client/runtime/library";
-
+ 
 export { OrderStatus, AdStatus, UserRole } from "@prisma/client";
 
 export interface OrderApiResponse<T = unknown> {

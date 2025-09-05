@@ -8,7 +8,7 @@ model SupportedPaymentMethod {
   logoUrl               String?
 
   userPaymentMethods    UserPaymentMethod[]
-  rates                 FiatCryptoRate[] 
+  // rates                 FiatCryptoRate[] 
 
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
@@ -39,78 +39,7 @@ model UserPaymentMethod {
   @@index([userId])
 }
 
-model MPesaKenya {
-  id                 String             @id @default(uuid())
-  phoneNumber        String             @unique
-  accountName        String?
-  currency           FiatCurrency       @default(KES)
-  displayName        String?            @default("M-Pesa Kenya")
-  userPaymentMethod  UserPaymentMethod  @relation(fields: [id], references: [id], onDelete: Cascade)
 
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-
-  @@map("mpesa_kenya")
-}
-
-model Cbe {
-  id                 String           @id @default(uuid())
-  accountNumber      String           @unique
-  accountName        String
-  displayName        String?          @default("Commercial Bank of Ethiopia")
-  currency           FiatCurrency     @default(ETB)
-
-  userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
-
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  
-  @@map("cbe")
-}
-
-model TeleBirr {
-  id                 String           @id @default(uuid())
-  phoneNumber        String           @unique
-  accountName        String?
-  currency           FiatCurrency     @default(ETB)
-  displayName        String?          @default("Tele Birr")
-
-  userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
-
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  
-  @@map("telebirr")
-}
-
-model FiatCryptoRate {
-  id                                String       @id @default(uuid())
-  advNo                             String
-  source                            Source
-  paymentMethodProvider             String
-  fiatCurrency                      FiatCurrency
-  cryptoCurrency                    CryptoCurrency
-  adType                            AdType
-
-  rawRate                           Decimal      @db.Decimal(18, 8)
-  volumeAvailable                   Decimal      @db.Decimal(36, 18)
-  minLimit                          Decimal      @db.Decimal(18, 2)
-  maxLimit                          Decimal      @db.Decimal(18, 2)
-  isActive                          Boolean      @default(true)
-
-  fetchedAt                         DateTime     @default(now())
-  expiresAt                         DateTime?
-  createdAt                         DateTime     @default(now())
-  updatedAt                         DateTime     @updatedAt
-
-  supportedPaymentMethodId          String?
-  supportedPaymentMethod            SupportedPaymentMethod? @relation(fields: [supportedPaymentMethodId], references: [id])
-
-  ads                               Ad[]
-  
-
-  @@index([fiatCurrency, cryptoCurrency, adType])
-}
 
  
 model Dispute {
@@ -154,4 +83,58 @@ model Dispute {
 
   @@unique([corridor, adType])
   @@map("pricing_configs")
+}
+
+
+// model FiatCryptoRate {
+//   id                      String     @id @default(uuid())
+//   corridor                String     // e.g., "USD-ETB"
+//   cryptoAsset             CryptoCurrency
+//   fiatAsset               FiatCurrency      
+//   adType                  AdType     
+//   source                  Source     @default(BINANCE)
+
+//   rate                    Decimal    @db.Decimal(65, 30)
+//   minVolumeThresholdUsed  Decimal    @db.Decimal(65, 30)
+//   adsUsedCount            Int        
+//   finalClientPrice        Decimal    @db.Decimal(65, 30)
+//   marginApplied           Decimal?   @db.Decimal(65, 30)
+//   lastFetchedAt           DateTime   @default(now())
+//   isActive                Boolean    @default(true)
+
+//   ads                     Ad[]        
+
+
+//   expiresAt               DateTime?
+//   createdAt               DateTime   @default(now())
+//   updatedAt               DateTime   @updatedAt
+  
+//   @@unique([corridor, adType])
+//   @@map("fiat_crypto_rates")
+// }
+
+
+model BinanceP2PAd {
+  id                      String          @id @default(uuid())
+  advNo                   String          @unique 
+  tradeType               AdType           
+  asset                   CryptoCurrency  
+  fiatCurrency            FiatCurrency     
+  price                   Decimal         @db.Decimal(18, 8)  
+  minSingleTransAmount    Decimal         @db.Decimal(18, 2) 
+  maxSingleTransAmount    Decimal         @db.Decimal(18, 2)  
+  tradableQuantity        Decimal         @db.Decimal(36, 18)
+  
+  // Timestamps
+  fetchedAt               DateTime        @default(now())   
+  expiresAt               DateTime         
+  
+  // Indexes for efficient querying
+  @@index([advNo])
+  @@index([tradeType])
+  @@index([asset])
+   @@index([fetchedAt])
+  @@index([expiresAt])
+  
+  @@map("binance_ads")
 }

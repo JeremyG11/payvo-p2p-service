@@ -1,5 +1,5 @@
+import Decimal from 'decimal.js';
 import { PrismaClient, Order, OrderStatus, AdStatus } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
 
 import { BadRequestError, NotFoundError } from '@/lib/error';
 import { TCreateOrderInput } from '@/schema/orders';
@@ -30,7 +30,6 @@ export class OrdersService {
       const ad = await this.prisma.ad.findUnique({
         where: { id: adId },
         include: {
-          fiatCryptoRate: true,
           agent: true,
           acceptedPaymentMethods: {
             select: {
@@ -59,22 +58,14 @@ export class OrdersService {
         throw new BadRequestError('Insufficient crypto available');
       }
 
-      const fiatCryptoRate = await tx.fiatCryptoRate.findUnique({
-        where: { id: ad.fiatCryptoRateId },
-      });
-      if (!fiatCryptoRate) throw new NotFoundError('FiatCryptoRate not found');
-
-      const adRate = new Decimal(fiatCryptoRate.rawRate);
-      const totalAmount = orderAmount.times(adRate);
-
       const order = await this.prisma.order.create({
         data: {
           customerId: userId,
           adId: ad.id,
           fiatAmount: orderAmount,
-          cryptoAmount: totalAmount,
-          orderNumber: userId, // Will change this later
-          unitPrice: ad.fiatCryptoRate as unknown as Decimal,
+          cryptoAmount: orderAmount.div(ad.unitPrice),
+          orderNumber: userId,
+          unitPrice: ad.unitPrice,
           agentId: ad.agentId,
           paymentMethodId: ad.acceptedPaymentMethods[0].paymentMethod.id,
           status: OrderStatus.PENDING_AGENT_CONFIRMATION,

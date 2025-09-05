@@ -1,13 +1,12 @@
-import { ServiceCacheService } from '@payvo/redis';
-import { Decimal } from '@prisma/client/runtime/library';
+import Decimal from 'decimal.js';
 
 /**
  * Interface for a cache service that strictly handles string-based values.
- * The `set` method returns a boolean indicating success or failure.
+ * The `set` method now returns void, aligning with common cache implementations.
  */
 interface IStringCacheService {
   get(key: string): Promise<string | null>;
-  set(key: string, value: string, ttl: number): Promise<boolean>;
+  set(key: string, value: string, ttl: number): Promise<void>;
 }
 
 /**

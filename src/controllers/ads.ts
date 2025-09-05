@@ -7,11 +7,21 @@ import {
 } from '@/lib/error';
 import { fetchAgentById } from '@/services/fetch-agents';
 import { AdsService } from '@/services/ads';
-import { AdStatus, Prisma, PrismaClient, UserKycStatus, UserRole } from '@prisma/client';
+import {
+  AdStatus,
+  AdType,
+  Prisma,
+  PrismaClient,
+  UserKycStatus,
+  UserRole,
+} from '@prisma/client';
 import { getAuthContext } from '@/lib/utils/helpers';
 import { ApiResponse } from '@/types';
 import { authenticate } from '@/middlewares/authenticate';
 import { authorize } from '@/middlewares/authorize';
+import { rateService } from '@/services/rates/calculation';
+import validator from '@/middlewares/validator';
+import { QueryAdTypeSchema } from '@/schema/ads';
 
 abstract class BaseController {
   protected sendSuccess<T>(res: Response, data?: T, message?: string): void {
@@ -52,7 +62,7 @@ abstract class BaseController {
 export class AdsController extends BaseController {
   constructor(
     private prisma: PrismaClient,
-    private adsService: AdsService = new AdsService(prisma)
+    private adsService: AdsService = new AdsService(prisma, rateService)
   ) {
     super();
   }
@@ -108,9 +118,16 @@ export class AdsController extends BaseController {
    * Handles the ad creation request.
    */
   async createAd(req: Request, res: Response): Promise<void> {
+    const { adType } = req.params;
+
     await this.handleRequest(req, res, 'createAd', async () => {
       const agent = await this.getAuthenticatedAgentProfile(req);
-      const newAd = await this.adsService.createAd(agent.userId, req.body);
+
+      const newAd = await this.adsService.createAd(
+        agent.userId,
+        req.body,
+        adType as AdType
+      );
 
       this.sendSuccess(res, newAd, 'Ad created successfully.');
     });
@@ -188,14 +205,14 @@ export class AdsController extends BaseController {
   routes(): Router {
     const router = Router();
 
-    router.get('/',  this.getAllAds.bind(this));
+    router.get('/', this.getAllAds.bind(this));
 
     router.get('/:id', this.getAdById.bind(this));
 
-
     // POST: Create a new ad.
     router.post(
-      '/',
+      '/:adType',
+      validator(QueryAdTypeSchema, 'params'),
       authenticate,
       authorize({ requiredPermissions: ['ads:create'] }),
       this.createAd.bind(this)

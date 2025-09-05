@@ -1,35 +1,51 @@
-import { z } from "zod";
+import { AdType, FiatCurrency } from '@prisma/client';
+import { z } from 'zod';
 
+export const AdTypeSchema = z
+  .enum(AdType)
+  .refine((val) => val === AdType.BUY || val === AdType.SELL, {
+    message: 'Invalid ad type. Must be BUY or SELL.',
+  });
+
+export const QueryAdTypeSchema = z.object({
+  adType: AdTypeSchema,
+});
 export const CreateAdSchema = z
-
   .object({
-    fiatCryptoRateId: z.string().min(1, "Invalid rate ID"),
+    unitPrice: z
+      .number({
+        error: 'Unit price must be a number',
+      })
+      .positive('Unit price must be a positive number'),
+
     availableAmount: z.coerce
       .number({
-        error: "Available amount must be a number",
+        error: 'Available amount must be a number',
       })
-      .positive("Available amount must be a positive number"),
+      .positive('Available amount must be a positive number'),
 
     minLimitFiat: z.coerce
       .number({
-        error: "Min limit must be a number",
+        error: 'Min limit must be a number',
       })
-      .positive("Min limit must be a positive number"),
+      .positive('Min limit must be a positive number'),
 
     maxLimitFiat: z.coerce
       .number({
-        error: "Max limit must be a number",
+        error: 'Max limit must be a number',
       })
-      .positive("Max limit must be a positive number"),
+      .positive('Max limit must be a positive number'),
 
     terms: z.string().optional(),
 
     title: z.string().optional(),
-
+    fiatCurrency: z.enum(
+      Object.keys(FiatCurrency) as [keyof typeof FiatCurrency]
+    ),
     paymentMethods: z
       .string()
       .array()
-      .min(1, { message: "An ad must have at least one payment method." }),
+      .min(1, { message: 'An ad must have at least one payment method.' }),
   })
   .strict();
 
@@ -42,7 +58,7 @@ export const UpdateAdSchema = z
     terms: z.string().min(10).optional(),
     title: z.string().min(3).max(100).optional(),
     paymentMethods: z.string().array().min(1).optional(),
-    status: z.enum(["ACTIVE", "PAUSED", "EXPIRED", "DELETED"]).optional(),
+    status: z.enum(['ACTIVE', 'PAUSED', 'EXPIRED', 'DELETED']).optional(),
     isOnline: z.boolean().optional(),
   })
   .strict();

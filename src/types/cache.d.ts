@@ -1,5 +1,4 @@
-import { Decimal } from '@prisma/client/runtime/library';
-
+ 
 /**
  * Interface for a generic cache service.
  * It is designed to handle different data types including Decimal.

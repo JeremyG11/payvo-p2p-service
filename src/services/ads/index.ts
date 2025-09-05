@@ -1,7 +1,16 @@
-import { PrismaClient, AdStatus, Prisma } from '@prisma/client';
-import { BadRequestError, NotFoundError } from '@/lib/error';
-import { TCreateAd, CreateAdSchema, TUpdateAd } from '@/schema/ads';
-import { Decimal } from '@prisma/client/runtime/library';
+import {
+  PrismaClient,
+  AdStatus,
+  Prisma,
+  CryptoCurrency,
+  AdType,
+} from '@prisma/client';
+import { BadRequestError, NotFoundError, ValidationError } from '@/lib/error';
+import { TCreateAd, CreateAdSchema } from '@/schema/ads';
+import { logger } from '@/lib/logger';
+import { RateService } from '@/services/rates/calculation';
+import Decimal from 'decimal.js';
+import { generateAdId } from '@/services/rates/utils/id-generator';
 
 /**
  * The AdsService class handles all business logic related to ads.
@@ -9,24 +18,12 @@ import { Decimal } from '@prisma/client/runtime/library';
  * This makes the codebase more maintainable and easier to test.
  */
 export class AdsService {
-  constructor(private prisma: PrismaClient) {
+  private prisma: PrismaClient;
+  private rateService: RateService;
+
+  constructor(prisma: PrismaClient, rateService: RateService) {
     this.prisma = prisma;
-  }
-
-  /**
-   * Validates the provided fiat/crypto rate and ensures it's active.
-   * This is a utility method to keep the main function clean.
-   */
-  private async validateRate(fiatCryptoRateId: string) {
-    const rate = await this.prisma.fiatCryptoRate.findUnique({
-      where: { id: fiatCryptoRateId, isActive: true },
-    });
-
-    if (!rate) {
-      throw new BadRequestError('Invalid or inactive rate');
-    }
-
-    return rate;
+    this.rateService = rateService;
   }
 
   /**
@@ -73,82 +70,120 @@ export class AdsService {
 
   /**
    * Creates a new ad after performing all necessary validations.
-   * This method is the core business logic for ad creation.
    */
-  async createAd(userId: string, adData: TCreateAd) {
+  async createAd(userId: string, adData: TCreateAd, adType: AdType) {
     if (!userId) {
       throw new BadRequestError('User ID is required');
     }
 
-    /**
-     * Validate the incoming ad data schema upfront
-     * This ensures that all required fields are present and correctly formatted.
-     */
+    // Validate the incoming ad data
     const validatedAdPayload = CreateAdSchema.safeParse(adData);
     if (!validatedAdPayload.success) {
-      throw new BadRequestError('Invalid ad data', {
-        details: validatedAdPayload.error.issues,
-      });
+      throw new ValidationError(
+        'Invalid ad data',
+        JSON.stringify({ details: validatedAdPayload.error.issues })
+      );
     }
 
     const {
+      fiatCurrency,
       paymentMethods,
       minLimitFiat,
+      unitPrice,
       maxLimitFiat,
-      fiatCryptoRateId,
       availableAmount,
-      terms = '',
+      ...rest
     } = validatedAdPayload.data;
 
-    /**
-     * Perform all necessary checks in parallel to improve performance.
-     * This includes fetching the agent, validating the rate, checking for duplicate ads,
-     * and validating payment methods simultaneously.
-     */
-    const [agent, rate, duplicateAd, agentPaymentMethods] = await Promise.all([
+    const advNo = await generateAdId();
+
+    // Check if user is an agent and if they have an active ad
+    const [agent, existingActiveAd] = await Promise.all([
       this.prisma.agent.findUnique({
         where: { userId },
       }),
-      this.validateRate(fiatCryptoRateId),
       this.prisma.ad.findFirst({
         where: {
           agent: { userId },
-          fiatCryptoRateId,
           status: AdStatus.ACTIVE,
+          fiatCurrency,
+          adType,
         },
       }),
-      this.validatePaymentMethods(paymentMethods, userId),
     ]);
 
-    // Perform all necessary checks after the concurrent lookups are complete.
     if (!agent) {
       throw new BadRequestError('Agent not found');
     }
 
-    if (duplicateAd) {
-      throw new BadRequestError('An active ad for this rate already exists');
+    if (existingActiveAd) {
+      throw new BadRequestError(
+        'An active ad for this currency and type already exists'
+      );
     }
 
-    // Create the new ad and its associated payment methods in a single atomic operation.
+    // Validate payment methods
+    const agentPaymentMethods = await this.validatePaymentMethods(
+      paymentMethods,
+      userId
+    );
+
+    // Get the current market rate
+    let marketRate;
+    try {
+      marketRate = await this.rateService.getMarketRate({
+        fiatCurrency,
+        cryptoCurrency: CryptoCurrency.USDT,
+        adType,
+      });
+    } catch (error) {
+      logger.error('Failed to get market rate', {
+        error,
+        fiatCurrency,
+        adType,
+      });
+      throw new BadRequestError(
+        'Failed to get market rate. Please try again later.'
+      );
+    }
+
+    // Create the new ad
     const newAd = await this.prisma.ad.create({
       data: {
-        advNo: rate.advNo,
+        advNo,
         agent: { connect: { id: agent.id } },
-        fiatCryptoRate: { connect: { id: rate.id } },
-        terms,
+        terms: rest?.terms,
         minLimitFiat: new Decimal(minLimitFiat),
         maxLimitFiat: new Decimal(maxLimitFiat),
         availableAmount: new Decimal(availableAmount),
+        unitPrice: marketRate.rate,
+        fiatCurrency,
+        adType,
+        status: AdStatus.ACTIVE,
         acceptedPaymentMethods: {
           create: agentPaymentMethods.paymentMethods.map((pm) => ({
             paymentMethod: { connect: { id: pm.id } },
           })),
         },
       },
+      include: {
+        acceptedPaymentMethods: {
+          include: {
+            paymentMethod: {
+              include: {
+                supportedPaymentMethod: true,
+              },
+            },
+          },
+        },
+      },
     });
+
+    logger.info('Ad created successfully', { adId: newAd.id, userId });
 
     return newAd;
   }
+
   async getAllAds(options: {
     page?: number;
     limit?: number;
