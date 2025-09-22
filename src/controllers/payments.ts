@@ -97,7 +97,7 @@ class MPesaKenyaHandler extends PaymentMethodHandler {
         validatedData.error.issues.map((issue) => issue.message).join(', ')
       );
     }
-    
+
     const { phoneNumber } = validatedData.data;
     const { isDefault = false } = req.body;
 
@@ -458,6 +458,8 @@ export class PaymentController {
         where: { isActive: true },
         select: {
           id: true,
+          category: true,
+          provider: true,
           currency: true,
           displayName: true,
         },
@@ -573,9 +575,24 @@ export class PaymentController {
         where: { userId },
         include: {
           supportedPaymentMethod: true,
-          mpesaKenya: true,
-          cbe: true,
-          telebirr: true,
+          mpesaKenya: {
+            select: {
+              phoneNumber: true,
+              accountName: true,
+            },
+          },
+          cbe: {
+            select: {
+              accountName: true,
+              accountNumber: true,
+            },
+          },
+          telebirr: {
+            select: {
+              phoneNumber: true,
+              accountName: true,
+            },
+          },
         },
       });
 
@@ -587,18 +604,17 @@ export class PaymentController {
         return {
           id: account.id,
           userId: account.userId,
+          supportedPaymentMethodId: account.supportedPaymentMethod.id,
+          provider: account.supportedPaymentMethod.provider,
+          category: account.supportedPaymentMethod.category,
+          displayName: account.supportedPaymentMethod.displayName,
+          currency: account.supportedPaymentMethod.currency,
+          details: {
+            ...userSpecificDetails,
+          },
           isDefault: account.isDefault,
           createdAt: account.createdAt,
           updatedAt: account.updatedAt,
-          paymentMethod: {
-            id: account.supportedPaymentMethod.id,
-            type: account.supportedPaymentMethod.category,
-            name: account.supportedPaymentMethod.category,
-            currency: account.supportedPaymentMethod.currency,
-            details: {
-              ...userSpecificDetails,
-            },
-          },
         };
       });
 

@@ -16,6 +16,11 @@ async function bootstrap() {
     throw new Error('JWT keys must be defined in environment.');
   }
 
+  // check if the REDIS_URL is defined
+  if (!config.redisUrl) {
+    throw new Error('REDIS_URL environment variable is required');
+  }
+
   logger.info('Connecting to Kafka…');
   await kafkaInit();
 

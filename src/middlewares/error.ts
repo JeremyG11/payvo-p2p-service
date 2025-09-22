@@ -1,7 +1,7 @@
-import { ZodError } from "zod";
-import { logger } from "@payvo/redis";
-import type { Request, Response, NextFunction } from "express";
-import { AppError, NotFoundError, ValidationError } from "@/lib/error";
+import { ZodError } from 'zod';
+import { logger } from '@payvo/redis';
+import type { Request, Response, NextFunction } from 'express';
+import { AppError, NotFoundError, ValidationError } from '@/lib/error';
 
 /**
  * Wraps async route handlers to automatically catch errors and forward to next().
@@ -21,7 +21,7 @@ export const notFoundHandler = (
   next: NextFunction
 ): void => {
   next(
-    new NotFoundError("The requested resource was not found on this server.")
+    new NotFoundError('The requested resource was not found on this server.')
   );
 };
 
@@ -39,7 +39,7 @@ export const globalErrorHandler = (
   if (err instanceof ZodError) {
     const validationError = new ValidationError(
       err.issues,
-      "Validation failed"
+      'Validation failed'
     );
     res.status(validationError.statusCode).json({
       success: false,
@@ -55,6 +55,8 @@ export const globalErrorHandler = (
       path: req.originalUrl,
     });
 
+    logger.debug(err.stack, { error: err.stack || err });
+
     res.status(err.statusCode).json({
       success: false,
       message: err.message,
@@ -66,11 +68,11 @@ export const globalErrorHandler = (
 
   // Finally, handle any unexpected or non-operational errors
   console.log(err.stack, err);
-  logger.error("Unexpected Server Error:", { error: err.stack || err });
+  logger.error('Unexpected Server Error:', { error: err.stack || err });
 
   res.status(500).json({
     success: false,
-    message: "An unexpected error occurred.",
+    message: 'An unexpected error occurred.',
     timestamp: new Date().toISOString(),
   });
 };

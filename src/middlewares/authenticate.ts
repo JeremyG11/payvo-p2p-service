@@ -28,7 +28,7 @@ export const authenticate = async (
 
     const { decoded, valid, expired } = verifyJwt(accessToken);
 
-    if (!valid || !decoded || typeof decoded.userId !== 'string') {
+    if (!valid || !decoded || typeof decoded.sub !== 'string') {
       logger.error(`Invalid JWT payload: ${JSON.stringify(decoded)}`);
       res.status(401).json({
         code: 'AuthenticationError',
@@ -37,8 +37,8 @@ export const authenticate = async (
       return;
     }
 
-    if (await blacklistService.isTokenBlacklisted(decoded.userId)) {
-      logger.warn(`Access denied for blacklisted user: ${decoded.userId}`);
+    if (await blacklistService.isTokenBlacklisted(decoded.sub)) {
+      logger.warn(`Access denied for blacklisted user: ${decoded.sub}`);
       res.status(403).json({
         code: 'UserBlacklisted',
         message: 'User account is suspended.',
@@ -61,27 +61,27 @@ export const authenticate = async (
       return;
     }
 
-    req.userId = decoded.userId;
+    req.userId = decoded.sub;
     res.locals.user = decoded;
 
     let authData: CachedAuthData | null = null;
 
     try {
       authData = await userCacheService.getUserData(
-        decoded.userId,
+        decoded.sub,
         UserCacheFields.AuthData
       );
     } catch (err) {
-      logger.error(`Redis error for ${decoded.userId}:`, err);
+      logger.error(`Redis error for ${decoded.sub}:`, err);
     }
 
     // On cache‐miss, fetch from Auth Service and cache it
     if (!authData) {
       try {
-        authData = await fetchUserPermissions(decoded.userId, accessToken);
+        authData = await fetchUserPermissions(decoded.sub, accessToken);
       } catch (err) {
         logger.error(
-          `Failed to fetch/cache permissions for ${decoded.userId}:`,
+          `Failed to fetch/cache permissions for ${decoded.sub}:`,
           err
         );
         res.status(503).json({

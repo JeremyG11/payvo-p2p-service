@@ -7,7 +7,6 @@ type Env = {
   DATABASE_URL: string;
 };
 
-export default defineConfig<Env>({
-  earlyAccess: true,
+export default defineConfig({
   schema: path.join("prisma", "schema"),
 });

@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis';
-import { ServiceCacheService } from '@payvo/redis';
 import { logger } from '@/lib/logger';
 import { config } from '@/config/env';
+import { ServiceCacheService } from '@payvo/redis';
 
 const P2P_NAMESPACE = 'p2p';
 
