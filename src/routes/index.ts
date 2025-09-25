@@ -11,7 +11,6 @@ const paymentController = new PaymentController(prisma);
 const rateController = new RateController(prisma);
 
 // rates routes
-
 router.use('/rates', rateController.router);
 
 // payment methods
