@@ -114,6 +114,22 @@ export class AdsController extends BaseController {
     return localAgent;
   }
 
+  async getAdWithAgent(req: Request, res: Response): Promise<void> {
+    await this.handleRequest(req, res, 'getAdWithAgent', async () => {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const status = req.query.status as AdStatus;
+
+      const ads = await this.adsService.getAdWithAgent({ page, limit, status });
+
+      this.sendSuccess(
+        res,
+        ads,
+        'Ads with agent details fetched successfully.'
+      );
+    });
+  }
+
   /**
    * Handles the ad creation request.
    */
@@ -206,7 +222,7 @@ export class AdsController extends BaseController {
     const router = Router();
 
     router.get('/', this.getAllAds.bind(this));
-
+    router.get('/all', this.getAdWithAgent.bind(this));
     router.get('/:id', this.getAdById.bind(this));
 
     // POST: Create a new ad.

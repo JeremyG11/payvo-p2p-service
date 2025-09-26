@@ -1,4 +1,5 @@
 import { AppError, BadRequestError, UnauthenticatedError } from '@/lib/error';
+import { logger } from '@/lib/logger';
 import { authenticate } from '@/middlewares/authenticate';
 import { authorize } from '@/middlewares/authorize';
 import { asyncWrapper } from '@/middlewares/error';
@@ -450,7 +451,6 @@ export class PaymentController {
     res: Response
   ): Promise<void> {
     try {
-      this.getUserId(req);
       const methods: Pick<
         SupportedPaymentMethod,
         'id' | 'currency' | 'displayName'
@@ -471,6 +471,7 @@ export class PaymentController {
         'Supported payment methods retrieved successfully'
       );
     } catch (error) {
+      logger.error('Error fetching supported payment methods', error);
       throw new AppError('Failed to retrieve payment methods', 500, error);
     }
   }

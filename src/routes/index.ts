@@ -1,9 +1,9 @@
-import { prisma } from '@/lib/prisma';
 import express, { Router } from 'express';
-import { PaymentController } from '@/controllers/payments';
-import { RateController } from '@/controllers/rates';
-import { authenticate } from '@/middlewares/authenticate';
+
+import { prisma } from '@/lib/prisma';
 import { AdsController } from '@/controllers/ads';
+import { RateController } from '@/controllers/rates';
+import { PaymentController } from '@/controllers/payments';
 
 const router: Router = express.Router();
 const adsController = new AdsController(prisma);
@@ -14,11 +14,7 @@ const rateController = new RateController(prisma);
 router.use('/rates', rateController.router);
 
 // payment methods
-router.use(
-  '/payments/payment-methods',
-  authenticate,
-  paymentController.routes()
-);
+router.use('/payments/payment-methods', paymentController.routes());
 
 // ads routes
 router.use('/ads', adsController.routes());

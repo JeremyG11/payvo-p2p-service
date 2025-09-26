@@ -11,6 +11,8 @@ import { logger } from '@/lib/logger';
 import { RateService } from '@/services/rates/calculation';
 import Decimal from 'decimal.js';
 import { generateAdId } from '@/services/rates/utils/id-generator';
+import { hashCacheService } from '@/config/radis';
+import { getAllActiveUsers } from '@/lib/utils/active-user';
 
 /**
  * The AdsService class handles all business logic related to ads.
@@ -301,5 +303,96 @@ export class AdsService {
       }
       throw e;
     }
+  }
+
+  /**
+   * Fetches ads along with their associated agent and user details.
+   * Supports pagination and filtering by ad status.
+   */
+  async getAdWithAgent(options: {
+    page?: number;
+    limit?: number;
+    status?: AdStatus;
+  }) {
+    const { page = 1, limit = 10, status } = options;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AdWhereInput = {};
+    if (status) {
+      where.status = status;
+    }
+
+    const allActiveUsers = await getAllActiveUsers();
+
+    const ads = await this.prisma.ad.findMany({
+      skip,
+      take: limit,
+      where,
+      include: {
+        agent: true,
+        acceptedPaymentMethods: {
+          include: {
+            paymentMethod: {
+              include: {
+                supportedPaymentMethod: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const totalCount = await this.prisma.ad.count({ where });
+
+    const agents = await Promise.all(
+      ads.map(async (ad) => {
+        const agent = ad.agent;
+        const paymentMethod =
+          ad.acceptedPaymentMethods[0]?.paymentMethod?.supportedPaymentMethod
+            ?.displayName ?? 'N/A';
+
+        const transactions = agent.totalOrders || 0;
+        const completed = agent.completedOrders || 0;
+
+        const activeSockets = allActiveUsers[agent.id];
+        const isAgentOnline =
+          !!activeSockets ||
+          !!(await hashCacheService.getField<boolean>(
+            'chat:active:users',
+            agent.id
+          ));
+        return {
+          id: ad.id,
+          name: `Agent-${agent.id}`,
+          verified: true,
+          transactions,
+          completionRate: transactions
+            ? parseFloat(((completed / transactions) * 100).toFixed(2))
+            : 100,
+          positiveRate: parseFloat(agent.rating?.toString?.() ?? '100') || 100,
+          price: `${parseFloat(ad.unitPrice.toString()).toFixed(2)} ${
+            ad.fiatCurrency
+          }`,
+          available: `${parseFloat(ad.availableAmount.toString()).toFixed(
+            2
+          )} USDT`,
+          limit: `${parseFloat(
+            ad.minLimitFiat.toString()
+          ).toLocaleString()} - ${parseFloat(
+            ad.maxLimitFiat.toString()
+          ).toLocaleString()} ${ad.fiatCurrency}`,
+          paymentMethod,
+          online: isAgentOnline,
+        };
+      })
+    );
+
+    return {
+      agents,
+      totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit),
+    };
   }
 }
