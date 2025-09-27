@@ -85,34 +85,6 @@ model Dispute {
 }
 
 
-// model FiatCryptoRate {
-//   id                      String     @id @default(uuid())
-//   corridor                String     // e.g., "USD-ETB"
-//   cryptoAsset             CryptoCurrency
-//   fiatAsset               FiatCurrency      
-//   adType                  AdType     
-//   source                  Source     @default(BINANCE)
-
-//   rate                    Decimal    @db.Decimal(65, 30)
-//   minVolumeThresholdUsed  Decimal    @db.Decimal(65, 30)
-//   adsUsedCount            Int        
-//   finalClientPrice        Decimal    @db.Decimal(65, 30)
-//   marginApplied           Decimal?   @db.Decimal(65, 30)
-//   lastFetchedAt           DateTime   @default(now())
-//   isActive                Boolean    @default(true)
-
-//   ads                     Ad[]        
-
-
-//   expiresAt               DateTime?
-//   createdAt               DateTime   @default(now())
-//   updatedAt               DateTime   @updatedAt
-  
-//   @@unique([corridor, adType])
-//   @@map("fiat_crypto_rates")
-// }
-
-
 model BinanceP2PAd {
   id                      String          @id @default(uuid())
   advNo                   String          @unique 
@@ -132,7 +104,7 @@ model BinanceP2PAd {
   @@index([advNo])
   @@index([tradeType])
   @@index([asset])
-   @@index([fetchedAt])
+  @@index([fetchedAt])
   @@index([expiresAt])
   
   @@map("binance_ads")

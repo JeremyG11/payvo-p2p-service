@@ -6,7 +6,7 @@ import {
   UnauthorizedError,
 } from '@/lib/error';
 import { fetchAgentById } from '@/services/fetch-agents';
-import { AdsService } from '@/services/ads';
+
 import {
   AdStatus,
   AdType,
@@ -22,6 +22,9 @@ import { authorize } from '@/middlewares/authorize';
 import { rateService } from '@/services/rates/calculation';
 import validator from '@/middlewares/validator';
 import { QueryAdTypeSchema } from '@/schema/ads';
+import { AdManagementService } from '@/services/ads/ad.management.service';
+import { AdQueryService } from '@/services/ads/ad.query.service';
+import { binanceService } from '@/services/rates/binance';
 
 abstract class BaseController {
   protected sendSuccess<T>(res: Response, data?: T, message?: string): void {
@@ -57,14 +60,24 @@ abstract class BaseController {
 /**
  * Controller for managing ads.
  * This controller handles incoming HTTP requests related to ads and delegates
- * the business logic to the AdsService.
+ * the business logic to the specialized AdManagementService and AdQueryService.
  */
 export class AdsController extends BaseController {
+  private adManagementService: AdManagementService;
+  private adQueryService: AdQueryService;
+
   constructor(
     private prisma: PrismaClient,
-    private adsService: AdsService = new AdsService(prisma, rateService)
+    // Inject the new specialized services, providing defaults for self-contained setup
+    adManagementService: AdManagementService = new AdManagementService(
+      prisma,
+      rateService
+    ),
+    adQueryService: AdQueryService = new AdQueryService(prisma, binanceService)
   ) {
     super();
+    this.adManagementService = adManagementService;
+    this.adQueryService = adQueryService;
   }
 
   /**
@@ -89,6 +102,7 @@ export class AdsController extends BaseController {
     const userId = this.getUserId(req);
     const { accessToken } = getAuthContext(req);
 
+    // This external fetch is okay to remain in the controller or a dedicated auth helper
     const { data: user } = await fetchAgentById(userId, accessToken);
 
     if (
@@ -114,13 +128,32 @@ export class AdsController extends BaseController {
     return localAgent;
   }
 
+  /**
+   * Retrieves ads with agent details and market analysis (delegates to AdQueryService).
+   */
   async getAdWithAgent(req: Request, res: Response): Promise<void> {
     await this.handleRequest(req, res, 'getAdWithAgent', async () => {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const status = req.query.status as AdStatus;
+      let pmProviders: string[] = [];
 
-      const ads = await this.adsService.getAdWithAgent({ page, limit, status });
+      const pm = req.query.pm;
+      if (typeof pm === 'string') {
+        pmProviders = pm.split(',');
+      } else if (Array.isArray(pm)) {
+        pmProviders = pm.flatMap((item) =>
+          typeof item === 'string' ? item.split(',') : []
+        );
+      }
+
+      // --- Use AdQueryService ---
+      const ads = await this.adQueryService.getAdWithAgent({
+        page,
+        limit,
+        status,
+        pmProviders,
+      });
 
       this.sendSuccess(
         res,
@@ -131,7 +164,7 @@ export class AdsController extends BaseController {
   }
 
   /**
-   * Handles the ad creation request.
+   * Handles the ad creation request (delegates to AdManagementService).
    */
   async createAd(req: Request, res: Response): Promise<void> {
     const { adType } = req.params;
@@ -139,7 +172,7 @@ export class AdsController extends BaseController {
     await this.handleRequest(req, res, 'createAd', async () => {
       const agent = await this.getAuthenticatedAgentProfile(req);
 
-      const newAd = await this.adsService.createAd(
+      const newAd = await this.adManagementService.createAd(
         agent.userId,
         req.body,
         adType as AdType
@@ -150,9 +183,7 @@ export class AdsController extends BaseController {
   }
 
   /**
-   * Handles the request to get all ads.
-   * This is a public endpoint and does not require a logged-in user.
-   * It also supports basic pagination.
+   * Handles the request to get all ads (delegates to AdQueryService).
    */
   async getAllAds(req: Request, res: Response): Promise<void> {
     await this.handleRequest(req, res, 'getAllAds', async () => {
@@ -161,56 +192,60 @@ export class AdsController extends BaseController {
       const limit = parseInt(req.query.limit as string) || 10;
       const status = req.query.status as AdStatus;
 
-      const ads = await this.adsService.getAllAds({ page, limit, status });
+      // --- Use AdQueryService ---
+      const ads = await this.adQueryService.getAllAds({ page, limit, status });
 
       this.sendSuccess(res, ads, 'Ads fetched successfully.');
     });
   }
 
   /**
-   * Handles the request to get a single ad by ID.
+   * Handles the request to get a single ad by ID (delegates to AdQueryService).
    */
   async getAdById(req: Request, res: Response): Promise<void> {
     await this.handleRequest(req, res, 'getAdById', async () => {
       const adId = req.params.id;
-      const ad = await this.adsService.getAdById(adId);
+      // --- Use AdQueryService ---
+      const ad = await this.adQueryService.getAdById(adId);
 
       this.sendSuccess(res, ad, 'Ad fetched successfully.');
     });
   }
 
   /**
-   * Handles the request to update an ad.
+   * Handles the request to update an ad (delegates to both services).
    */
   async updateAd(req: Request, res: Response): Promise<void> {
     await this.handleRequest(req, res, 'updateAd', async () => {
       const { id: adId } = req.params;
       const userId = this.getUserId(req);
 
-      const existingAd = await this.adsService.getAdById(adId);
+      const existingAd = await this.adQueryService.getAdById(adId);
       if (existingAd.agent.userId !== userId) {
         throw new UnauthorizedError('You are not the owner of this ad.');
       }
 
-      const updatedAd = await this.adsService.updateAd(adId, req.body);
+      const updatedAd = await this.adManagementService.updateAd(adId, req.body);
       this.sendSuccess(res, updatedAd, 'Ad updated successfully.');
     });
   }
 
   /**
-   * Handles the request to delete an ad.
+   * Handles the request to delete an ad (delegates to both services).
    */
   async deleteAd(req: Request, res: Response): Promise<void> {
     await this.handleRequest(req, res, 'deleteAd', async () => {
       const { id: adId } = req.params;
       const userId = this.getUserId(req);
 
-      const existingAd = await this.adsService.getAdById(adId);
+      // Authorization check needs to fetch the existing ad (Query Service)
+      const existingAd = await this.adQueryService.getAdById(adId);
       if (existingAd.agent.userId !== userId) {
         throw new UnauthorizedError('You are not the owner of this ad.');
       }
 
-      await this.adsService.deleteAd(adId);
+      // Delete operation (Management Service)
+      await this.adManagementService.deleteAd(adId);
       this.sendSuccess(res, null, 'Ad deleted successfully.');
     });
   }

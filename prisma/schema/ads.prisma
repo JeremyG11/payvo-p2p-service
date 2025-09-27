@@ -18,6 +18,7 @@ model Ad {
 
   adType                  AdType
   fiatCurrency            FiatCurrency
+
   unitPrice               Decimal               @db.Decimal(36, 8)
   availableAmount         Decimal               @db.Decimal(36, 18)
   minLimitFiat            Decimal               @db.Decimal(18, 2)
@@ -31,4 +32,5 @@ model Ad {
   acceptedPaymentMethods  AdsOnPaymentMethods[]
 
   @@index([agentId, status])
+  @@map("ads")
 }

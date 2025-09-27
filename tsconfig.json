@@ -22,6 +22,7 @@
     "./src/**/*",
     "./prisma.config.ts",
     "./src/types/**/*.d.ts",
-    "src/**/*.d.ts"
+    "src/**/*.d.ts",
+    "__tests__/**/*"
   ]
 }

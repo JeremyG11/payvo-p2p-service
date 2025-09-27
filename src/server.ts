@@ -4,8 +4,8 @@ import { config } from '@/config/env';
 import { logger } from '@/lib/logger';
 import { initRedis, shutdownRedis } from '@/config/radis';
 import kafkaInit, { disconnectKafka } from '@/config/kafka';
+import { schedulerService } from '@/services/rates/cleanup';
 import { blacklistService } from '@/services/cache/blacklist-cache';
-import { cleanupService } from '@/services/rates/cleanup/cleanup.service';
 import { seedAllSupportedPaymentMethods } from '@/seeders/payment-methods.seeder';
 
 const HOST = process.env.HOST || '0.0.0.0';
@@ -37,7 +37,7 @@ async function startServer() {
     logger.info('Starting scheduled tasks…');
 
     // Start the cron task using the service instance
-    cleanupService.scheduleAllTasks();
+    schedulerService.scheduleAllTasks();
 
     const server = http.createServer(app);
     server.listen(PORT, HOST, () => {
@@ -62,7 +62,7 @@ async function startServer() {
       await shutdownRedis();
 
       // Stop the scheduled task correctly
-      cleanupService.stopAllTasks();
+      schedulerService.stopAllTasks();
 
       process.exit(0);
     };

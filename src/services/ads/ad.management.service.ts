@@ -5,21 +5,20 @@ import {
   CryptoCurrency,
   AdType,
 } from '@prisma/client';
-import { BadRequestError, NotFoundError, ValidationError } from '@/lib/error';
-import { TCreateAd, CreateAdSchema } from '@/schema/ads';
-import { logger } from '@/lib/logger';
-import { RateService } from '@/services/rates/calculation';
 import Decimal from 'decimal.js';
+import { logger } from '@/lib/logger';
+import { TCreateAd, CreateAdSchema } from '@/schema/ads';
+import { RateService } from '@/services/rates/calculation';
 import { generateAdId } from '@/services/rates/utils/id-generator';
-import { hashCacheService } from '@/config/radis';
-import { getAllActiveUsers } from '@/lib/utils/active-user';
+import { BadRequestError, NotFoundError, ValidationError } from '@/lib/error';
 
 /**
- * The AdsService class handles all business logic related to ads.
- * It's separated from the controller to promote a clear separation of concerns.
- * This makes the codebase more maintainable and easier to test.
+ * The AdManagementService handles all core business logic related to
+ * creating, updating, and deleting classified ads.
+ * It ensures data integrity, performs necessary validations (like payment methods),
+ * and fetches external data (like market rates) required for ad creation.
  */
-export class AdsService {
+export class AdManagementService {
   private prisma: PrismaClient;
   private rateService: RateService;
 
@@ -30,7 +29,7 @@ export class AdsService {
 
   /**
    * Validates the provided payment methods against the user's registered methods.
-   * It also ensures all provided payment methods belong to the user.
+   * It ensures all provided payment methods are active and belong to the user.
    */
   private async validatePaymentMethods(
     paymentMethodIds: string[],
@@ -72,18 +71,22 @@ export class AdsService {
 
   /**
    * Creates a new ad after performing all necessary validations.
+   * @param userId The ID of the user creating the ad.
+   * @param adData The validated data for the new ad.
+   * @param adType The type of the ad (BUY or SELL).
+   * @returns The newly created ad object with its associated payment methods.
    */
   async createAd(userId: string, adData: TCreateAd, adType: AdType) {
     if (!userId) {
       throw new BadRequestError('User ID is required');
     }
 
-    // Validate the incoming ad data
+    // 1. Validate the incoming ad data
     const validatedAdPayload = CreateAdSchema.safeParse(adData);
     if (!validatedAdPayload.success) {
-      throw new ValidationError(
+      throw new BadRequestError(
         'Invalid ad data',
-        JSON.stringify({ details: validatedAdPayload.error.issues })
+        validatedAdPayload.error.issues
       );
     }
 
@@ -91,15 +94,14 @@ export class AdsService {
       fiatCurrency,
       paymentMethods,
       minLimitFiat,
-      unitPrice,
       maxLimitFiat,
-      availableAmount,
+      quantity: availableAmount,
       ...rest
     } = validatedAdPayload.data;
 
     const advNo = await generateAdId();
 
-    // Check if user is an agent and if they have an active ad
+    // 2. Check user status and active ads
     const [agent, existingActiveAd] = await Promise.all([
       this.prisma.agent.findUnique({
         where: { userId },
@@ -124,13 +126,13 @@ export class AdsService {
       );
     }
 
-    // Validate payment methods
+    // 3. Validate payment methods
     const agentPaymentMethods = await this.validatePaymentMethods(
       paymentMethods,
       userId
     );
 
-    // Get the current market rate
+    // 4. Get the current market rate
     let marketRate;
     try {
       marketRate = await this.rateService.getMarketRate({
@@ -149,7 +151,7 @@ export class AdsService {
       );
     }
 
-    // Create the new ad
+    // 5. Create the new ad
     const newAd = await this.prisma.ad.create({
       data: {
         advNo,
@@ -186,54 +188,6 @@ export class AdsService {
     return newAd;
   }
 
-  async getAllAds(options: {
-    page?: number;
-    limit?: number;
-    status?: AdStatus;
-  }) {
-    const { page = 1, limit = 10, status } = options;
-    const skip = (page - 1) * limit;
-
-    const where: Prisma.AdWhereInput = {};
-    if (status) {
-      where.status = status;
-    }
-
-    const ads = await this.prisma.ad.findMany({
-      skip,
-      take: limit,
-      where,
-      include: {
-        agent: true,
-      },
-    });
-
-    const totalCount = await this.prisma.ad.count({ where });
-
-    return {
-      ads,
-      totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit),
-    };
-  }
-
-  async getAdById(adId: string) {
-    const ad = await this.prisma.ad.findUnique({
-      where: { id: adId },
-      include: {
-        agent: true,
-      },
-    });
-
-    if (!ad) {
-      throw new NotFoundError('Ad not found.');
-    }
-
-    return ad;
-  }
-
   /**
    * Updates an existing ad with the provided data.
    * @param adId The ID of the ad to update.
@@ -252,15 +206,32 @@ export class AdsService {
         maxLimitFiat: restOfData.maxLimitFiat
           ? new Decimal(restOfData.maxLimitFiat)
           : undefined,
-        availableAmount: restOfData.availableAmount
-          ? new Decimal(restOfData.availableAmount)
+        availableAmount: restOfData.quantity
+          ? new Decimal(restOfData.quantity)
           : undefined,
       };
 
       if (paymentMethods) {
+        // Validation of payment methods is critical during update as well
+        const existingAd = await this.prisma.ad.findUnique({
+          where: { id: adId },
+          select: { agent: { select: { userId: true } } },
+        });
+        if (!existingAd || !existingAd.agent.userId) {
+          throw new NotFoundError('Ad or associated agent not found.');
+        }
+
+        const agentPaymentMethods = await this.validatePaymentMethods(
+          paymentMethods,
+          existingAd.agent.userId
+        );
+
         dataToUpdate.acceptedPaymentMethods = {
-          set: paymentMethods.map((id) => ({
-            adId_paymentMethodId: { adId, paymentMethodId: id },
+          set: agentPaymentMethods.paymentMethods.map((pm) => ({
+            adId_paymentMethodId: {
+              adId: adId,
+              paymentMethodId: pm.id,
+            },
           })),
         };
       }
@@ -303,96 +274,5 @@ export class AdsService {
       }
       throw e;
     }
-  }
-
-  /**
-   * Fetches ads along with their associated agent and user details.
-   * Supports pagination and filtering by ad status.
-   */
-  async getAdWithAgent(options: {
-    page?: number;
-    limit?: number;
-    status?: AdStatus;
-  }) {
-    const { page = 1, limit = 10, status } = options;
-    const skip = (page - 1) * limit;
-
-    const where: Prisma.AdWhereInput = {};
-    if (status) {
-      where.status = status;
-    }
-
-    const allActiveUsers = await getAllActiveUsers();
-
-    const ads = await this.prisma.ad.findMany({
-      skip,
-      take: limit,
-      where,
-      include: {
-        agent: true,
-        acceptedPaymentMethods: {
-          include: {
-            paymentMethod: {
-              include: {
-                supportedPaymentMethod: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    const totalCount = await this.prisma.ad.count({ where });
-
-    const agents = await Promise.all(
-      ads.map(async (ad) => {
-        const agent = ad.agent;
-        const paymentMethod =
-          ad.acceptedPaymentMethods[0]?.paymentMethod?.supportedPaymentMethod
-            ?.displayName ?? 'N/A';
-
-        const transactions = agent.totalOrders || 0;
-        const completed = agent.completedOrders || 0;
-
-        const activeSockets = allActiveUsers[agent.id];
-        const isAgentOnline =
-          !!activeSockets ||
-          !!(await hashCacheService.getField<boolean>(
-            'chat:active:users',
-            agent.id
-          ));
-        return {
-          id: ad.id,
-          name: `Agent-${agent.id}`,
-          verified: true,
-          transactions,
-          completionRate: transactions
-            ? parseFloat(((completed / transactions) * 100).toFixed(2))
-            : 100,
-          positiveRate: parseFloat(agent.rating?.toString?.() ?? '100') || 100,
-          price: `${parseFloat(ad.unitPrice.toString()).toFixed(2)} ${
-            ad.fiatCurrency
-          }`,
-          available: `${parseFloat(ad.availableAmount.toString()).toFixed(
-            2
-          )} USDT`,
-          limit: `${parseFloat(
-            ad.minLimitFiat.toString()
-          ).toLocaleString()} - ${parseFloat(
-            ad.maxLimitFiat.toString()
-          ).toLocaleString()} ${ad.fiatCurrency}`,
-          paymentMethod,
-          online: isAgentOnline,
-        };
-      })
-    );
-
-    return {
-      agents,
-      totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit),
-    };
   }
 }
