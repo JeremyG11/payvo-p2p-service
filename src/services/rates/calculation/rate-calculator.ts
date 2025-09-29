@@ -6,7 +6,6 @@ import { RawAdRate } from '../../../types/interface';
  * including median finding, outlier filtering, and volume weighting.
  */
 export class RateCalculator {
-  // Configuration for deviation check, moved from the main service
   private readonly MAX_RATE_DEVIATION = 0.05;
 
   /**
@@ -67,4 +66,18 @@ export class RateCalculator {
       ? (sorted[mid - 1] + sorted[mid]) / 2
       : sorted[mid];
   }
+
+  public computeDeviationPercent(
+    ads: RawAdRate[],
+    marketRate: Decimal
+  ): RawAdRate[] {
+    return ads.map((ad) => ({
+      ...ad,
+      deviationPercent: marketRate.isZero()
+        ? new Decimal(0)
+        : ad.rawRate.minus(marketRate).dividedBy(marketRate),
+    }));
+  }
 }
+
+export const rateCalculator = new RateCalculator();

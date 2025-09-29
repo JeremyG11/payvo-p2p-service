@@ -136,6 +136,8 @@ export class AdsController extends BaseController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const status = req.query.status as AdStatus;
+      const fromCurrency = req.query.from as string;
+      const toCurrency = req.query.to as string;
       let pmProviders: string[] = [];
 
       const pm = req.query.pm;
@@ -147,12 +149,13 @@ export class AdsController extends BaseController {
         );
       }
 
-      // --- Use AdQueryService ---
       const ads = await this.adQueryService.getAdWithAgent({
         page,
         limit,
         status,
         pmProviders,
+        fromCurrency,
+        toCurrency,
       });
 
       this.sendSuccess(

@@ -13,7 +13,10 @@
     "postinstall": "npx prisma generate",
     "db:deploy": "npx prisma migrate deploy && npx prisma generate",
     "prisma": "npx prisma",
-    "db:push": "npx prisma db push"
+    "db:push": "npx prisma db push",
+    "seed:pricing": "ts-node -r module-alias/register src/scripts/seeds/seed-pricing-configs.ts",
+    "seed:ads": "ts-node -r module-alias/register src/scripts/seeds/seed-ads.ts"
+
   },
   "keywords": [],
   "author": "",

@@ -81,9 +81,19 @@ export const PAIRS_TO_FETCH = [
     adType: AdType.BUY,
   },
   {
+    fiat: FiatCurrency.USD,
+    crypto: CryptoCurrency.USDT,
+    adType: AdType.SELL,
+  },
+  {
     fiat: FiatCurrency.KES,
     crypto: CryptoCurrency.USDT,
     adType: AdType.SELL,
+  },
+  {
+    fiat: FiatCurrency.KES,
+    crypto: CryptoCurrency.USDT,
+    adType: AdType.BUY,
   },
   {
     fiat: FiatCurrency.ETB,
@@ -91,8 +101,18 @@ export const PAIRS_TO_FETCH = [
     adType: AdType.SELL,
   },
   {
+    fiat: FiatCurrency.ETB,
+    crypto: CryptoCurrency.USDT,
+    adType: AdType.BUY,
+  },
+  {
     fiat: FiatCurrency.UGX,
     crypto: CryptoCurrency.USDT,
     adType: AdType.SELL,
+  },
+  {
+    fiat: FiatCurrency.UGX,
+    crypto: CryptoCurrency.USDT,
+    adType: AdType.BUY,
   },
 ];

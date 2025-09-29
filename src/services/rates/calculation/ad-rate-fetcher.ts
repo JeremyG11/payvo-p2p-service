@@ -193,6 +193,7 @@ export class AdRateFetcher {
       rawRate: ad.price,
       volumeAvailable: ad.tradableQuantity || new Decimal(0),
       maxLimit: ad.maxSingleTransAmount,
+      
     }));
   }
 }

@@ -1,4 +1,4 @@
-import { AdType, CryptoCurrency, FiatCurrency } from '@prisma/client';
+import { AdType, FiatCurrency } from '@prisma/client';
 import { z } from 'zod';
 
 export const AdTypeSchema = z
@@ -11,18 +11,16 @@ export const QueryAdTypeSchema = z.object({
   adType: AdTypeSchema,
 });
 export const CreateAdSchema = z
+
   .object({
+    crypto: z.string().optional(),
+    adType: AdTypeSchema,
+
     unitPrice: z
       .number({
         error: 'Unit price must be a number',
       })
       .positive('Unit price must be a positive number'),
-
-    quantity: z.coerce
-      .number({
-        error: 'Quantity must be a number',
-      })
-      .positive('Quantity must be a positive number'),
 
     minLimitFiat: z.coerce
       .number({
@@ -35,16 +33,16 @@ export const CreateAdSchema = z
         error: 'Max limit must be a number',
       })
       .positive('Max limit must be a positive number'),
-
-    crypto: z.enum(CryptoCurrency).refine((val) => val in CryptoCurrency, {
-      message: 'Invalid cryptocurrency.',
+    fromCurrency: z.enum(FiatCurrency).refine((val) => val in FiatCurrency, {
+      message: 'Invalid fiat currency.',
+    }),
+    toCurrency: z.enum(FiatCurrency).refine((val) => val in FiatCurrency, {
+      message: 'Invalid fiat currency.',
     }),
     terms: z.string().optional(),
 
     title: z.string().optional(),
-    fiatCurrency: z.enum(
-      Object.keys(FiatCurrency) as [keyof typeof FiatCurrency]
-    ),
+
     paymentMethods: z
       .string()
       .array()

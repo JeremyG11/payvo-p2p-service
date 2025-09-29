@@ -1,5 +1,5 @@
 import { logger } from '@/lib/logger';
-import { BinanceP2PService } from '@/services/rates/binance';
+import { BinanceP2PAdSynchronizer } from '@/services/rates/binance';
 
 /**
  * BinanceSyncWorker is responsible for all interaction with the Binance
@@ -7,7 +7,7 @@ import { BinanceP2PService } from '@/services/rates/binance';
  * old, expired Binance P2P records.
  */
 export class BinanceSyncWorker {
-  constructor(private readonly binanceService: BinanceP2PService) {}
+  constructor(private readonly binanceService: BinanceP2PAdSynchronizer) {}
 
   /**
    * Fetches and stores Binance ads using the BinanceService.

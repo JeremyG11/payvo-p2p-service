@@ -1,5 +1,5 @@
-import { Request } from "express";
-import { User } from "@prisma/client";
+import { Request } from 'express';
+import { User } from '@prisma/client';
 
 declare global {
   namespace Express {
@@ -21,14 +21,14 @@ declare global {
   }
 }
 
-declare module "express-session" {
+declare module 'express-session' {
   interface SessionData {
     currentChallenge?: string;
     passkeyRegistrationUserId?: string;
   }
 }
 
-declare module "express" {
+declare module 'express' {
   interface Request {
     session: Express.Session & Express.SessionData;
   }

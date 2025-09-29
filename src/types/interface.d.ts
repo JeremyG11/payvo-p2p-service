@@ -1,7 +1,6 @@
-
 /**
  * Input parameters required for rate calculation.
- * 
+ *
  * @property fiatCurrency - The fiat currency involved in the calculation.
  * @property cryptoCurrency - The cryptocurrency involved in the calculation.
  * @property adType - The type of advertisement (buy/sell).
@@ -10,7 +9,7 @@ export interface RateCalculationInput {}
 
 /**
  * Represents a calculated rate with its metadata.
- * 
+ *
  * @property rate - The calculated rate as a Decimal value.
  * @property source - The source of the rate (e.g., binance, market, fallback, database).
  * @property sourceDetail - Optional details about the rate source.
@@ -25,7 +24,7 @@ export interface ICalculatedRate {}
 
 /**
  * Represents a corridor rate between two fiat currencies, including inbound and outbound rates.
- * 
+ *
  * @property fromCurrency - The source fiat currency.
  * @property toCurrency - The destination fiat currency.
  * @property rate - The calculated corridor rate as a Decimal value.
@@ -66,7 +65,6 @@ export interface ICorridorRate {
   stale?: boolean;
   calculationMethod?: string;
 }
-
 
 export interface RateCalculationInput {
   fiatCurrency: FiatCurrency;

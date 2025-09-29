@@ -19,13 +19,16 @@ model Ad {
   adType                  AdType
   fiatCurrency            FiatCurrency
 
+  fromCurrency            FiatCurrency
+  toCurrency              FiatCurrency
+
   unitPrice               Decimal               @db.Decimal(36, 8)
-  availableAmount         Decimal               @db.Decimal(36, 18)
   minLimitFiat            Decimal               @db.Decimal(18, 2)
   maxLimitFiat            Decimal               @db.Decimal(18, 2)
+  deviationPercent        Decimal?              @db.Decimal(10, 5)
 
   createdAt               DateTime              @default(now())
-  updatedAt               DateTime @updatedAt
+  updatedAt               DateTime              @updatedAt
 
   agent                   Agent                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
   orders                  Order[]
@@ -34,3 +37,5 @@ model Ad {
   @@index([agentId, status])
   @@map("ads")
 }
+
+ 

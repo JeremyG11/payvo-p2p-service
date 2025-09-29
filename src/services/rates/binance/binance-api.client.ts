@@ -27,7 +27,6 @@ interface BinanceP2PResponseData {
 interface BinanceP2PResponse {
   data?: BinanceP2PResponseData[];
 }
-// --- End Interfaces ---
 
 /**
  * BinanceAPIClient handles direct communication with the external Binance P2P API.

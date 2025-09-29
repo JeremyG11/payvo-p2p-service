@@ -16,6 +16,10 @@ export const AddTeleBirrSchema = z.object({
   phoneNumber: z.string().min(10).max(15),
 });
 
+export const AddPaymentMethodQueryParamsSchema = z.object({
+  methodName: z.enum(['mpesa-kenya', 'cbe', 'telebirr']),
+});
+
 export type AddMPesaKenyaPayload = z.infer<typeof AddMPesaKenyaSchema>;
 export type AddCbePaymentMethodPayload = z.infer<
   typeof AddCbePaymentMethodSchema

@@ -47,11 +47,10 @@ export class BinanceP2PAdSynchronizer {
     adType: AdType
   ): Promise<void> {
     try {
-      // 1. Fetch raw data from external API (delegated to API Client)
       const ads = await this.apiClient.fetchBinanceP2PAds(
         fiatCurrency,
         adType,
-        20 // Fetch a slightly higher limit to ensure enough valid ads remain after filtering
+        20
       );
 
       if (ads.length === 0) {
@@ -96,11 +95,6 @@ export class BinanceP2PAdSynchronizer {
   ): Promise<ProcessedAd[]> {
     return this.repository.getAds(fiatCurrency, cryptoCurrency, adType, limit);
   }
-
-  /**
-   * The calculateVolumeWeightedAverage method has been removed as that logic
-   * belongs in the RateCalculator service to avoid duplicate functionality.
-   */
 }
 
 // Create a singleton instance

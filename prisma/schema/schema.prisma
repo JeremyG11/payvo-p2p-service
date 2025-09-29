@@ -24,18 +24,3 @@ model Customer {
   @@index([userId])
 }
 
-model Agent {
-  id                 String   @id @default(uuid())
-  userId             String   @unique
-  totalOrders        Int      @default(0)
-  completedOrders    Int      @default(0)
-  commissionRate     Decimal  @db.Decimal(5, 2) @default(0.0)
-  rating             Decimal  @db.Decimal(3, 2) @default(0.0)
-
-  balances           Balance[]
-  ads                Ad[]
-  orders             Order[]
-  disputes           Dispute[] @relation("AgentDisputes")
-
-  @@index([userId])
-}

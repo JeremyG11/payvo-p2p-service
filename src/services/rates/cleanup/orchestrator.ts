@@ -1,8 +1,11 @@
-import {prisma} from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { PrismaClient } from '@prisma/client';
 import cron, { ScheduledTask } from 'node-cron';
-import { BinanceP2PService, binanceService } from '@/services/rates/binance';
+import {
+  BinanceP2PAdSynchronizer,
+  binanceService,
+} from '@/services/rates/binance';
 import { RateCleanupWorker } from '@/services/rates/cleanup/rate-cleanup-worker';
 import { BinanceSyncWorker } from '@/services/rates/cleanup/binance-sync-worker';
 
@@ -24,12 +27,11 @@ export class SchedulerService {
   private rateCleanupWorker: RateCleanupWorker;
   private binanceSyncWorker: BinanceSyncWorker;
 
-  constructor(prisma: PrismaClient, binanceService: BinanceP2PService) {
+  constructor(prisma: PrismaClient, binanceService: BinanceP2PAdSynchronizer) {
     // Instantiate the dedicated worker classes
     this.rateCleanupWorker = new RateCleanupWorker(prisma);
     this.binanceSyncWorker = new BinanceSyncWorker(binanceService);
   }
-
 
   /**
    * Executes the Rate Cleanup task, preventing concurrent runs.
@@ -88,14 +90,12 @@ export class SchedulerService {
     }
   }
 
-  // --- Scheduling Methods (Core Responsibility of this Service) ---
-
   /**
    * Schedules all cleanup and fetch tasks with default cron expressions.
    */
   public scheduleAllTasks(): void {
-    this.scheduleRateCleanup('*/5 * * * *'); // Every 5 minutes
-    this.scheduleBinanceAdsFetch('*/2 * * * *'); // Every 2 minutes
+    this.scheduleRateCleanup('*/15 * * * *'); // Every 5 minutes
+    this.scheduleBinanceAdsFetch('*/12 * * * *'); // Every 2 minutes
     this.scheduleBinanceAdsCleanup('0 * * * *'); // Every hour
     logger.info('All scheduler tasks initialized and started.');
   }
@@ -222,7 +222,7 @@ let schedulerServiceInstance: SchedulerService | null = null;
  */
 export function getSchedulerService(
   prisma: PrismaClient,
-  binanceService: BinanceP2PService
+  binanceService: BinanceP2PAdSynchronizer
 ): SchedulerService {
   if (!schedulerServiceInstance) {
     schedulerServiceInstance = new SchedulerService(prisma, binanceService);

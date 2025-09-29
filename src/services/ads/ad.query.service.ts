@@ -9,7 +9,12 @@ import {
 import Decimal from 'decimal.js';
 import { logger } from '@/lib/logger';
 import { NotFoundError } from '@/lib/error';
-import { BinanceP2PService, ProcessedAd } from '@/services/rates/binance';
+import {
+  BinanceP2PAdSynchronizer,
+  ProcessedAd,
+} from '@/services/rates/binance';
+import { rateCalculator } from '../rates/calculation/rate-calculator';
+import de from 'zod/v4/locales/de.js';
 
 /**
  * The AdQueryService handles all business logic related to fetching, filtering,
@@ -18,11 +23,13 @@ import { BinanceP2PService, ProcessedAd } from '@/services/rates/binance';
  */
 export class AdQueryService {
   private prisma: PrismaClient;
-  private readonly binanceService: BinanceP2PService;
+  private readonly binanceService: BinanceP2PAdSynchronizer;
+  private rateCalculator = rateCalculator;
 
-  constructor(prisma: PrismaClient, binanceService: BinanceP2PService) {
+  constructor(prisma: PrismaClient, binanceService: BinanceP2PAdSynchronizer) {
     this.prisma = prisma;
     this.binanceService = binanceService;
+    this.rateCalculator = rateCalculator;
   }
 
   /**
@@ -96,22 +103,24 @@ export class AdQueryService {
     page?: number;
     limit?: number;
     status?: AdStatus;
-    fiatCurrency?: string;
+    fromCurrency?: string;
+    toCurrency?: string;
     pmProviders?: string[];
   }) {
     const {
       page = 1,
       limit = 10,
       status,
-      fiatCurrency,
+      fromCurrency,
+      toCurrency,
       pmProviders = [],
     } = options;
     const skip = (page - 1) * limit;
 
-    // 1. Build the complex WHERE clause for filtering
     const where: Prisma.AdWhereInput = {
       status: status || AdStatus.ACTIVE,
-      ...(fiatCurrency && { fiatCurrency: fiatCurrency as FiatCurrency }),
+      ...(fromCurrency && { fromCurrency: fromCurrency as FiatCurrency }),
+      ...(toCurrency && { toCurrency: toCurrency as FiatCurrency }),
       ...(pmProviders.length > 0 && {
         acceptedPaymentMethods: {
           some: {
@@ -146,7 +155,6 @@ export class AdQueryService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // 2. Fetch Binance VWAP rates for analysis
     const fiatTypes = Array.from(new Set(ads.map((a) => a.fiatCurrency)));
     const adTypes = Array.from(new Set(ads.map((a) => a.adType)));
     const binanceRates: Record<string, Decimal> = {};
@@ -161,18 +169,12 @@ export class AdQueryService {
             20
           );
         binanceRates[`${fiat}-${adType}`] =
-          this.binanceService.calculateVolumeWeightedAverage(bAds);
+          this.rateCalculator.calculateVolumeWeightedRate(bAds);
       }
     }
 
-    // 3. Process and transform ad data, performing market safety check
     const agents = ads.map((ad) => {
       const agent = ad.agent;
-      const paymentMethod =
-        ad.acceptedPaymentMethods[0]?.paymentMethod?.supportedPaymentMethod
-          ?.displayName ?? 'N/A';
-
-      // Rate deviation calculation
       const marketRate =
         binanceRates[`${ad.fiatCurrency}-${ad.adType}`] ||
         new Decimal(ad.unitPrice);
@@ -181,7 +183,6 @@ export class AdQueryService {
         ? 0
         : adPrice.minus(marketRate).dividedBy(marketRate).times(100).toNumber();
 
-      // Market Safety Check: Optional auto-pause if deviation > 5%
       if (Math.abs(deviationPercent) > 5 && ad.status === AdStatus.ACTIVE) {
         this.prisma.ad
           .update({ where: { id: ad.id }, data: { status: AdStatus.INACTIVE } })
@@ -190,10 +191,9 @@ export class AdQueryService {
           );
       }
 
-      // Return the transformed, denormalized agent/ad view
       return {
         id: ad.id,
-        name: `Agent-${agent.id}`,
+        name: agent.name,
         verified: true,
         transactions: agent.totalOrders || 0,
         completionRate: agent.totalOrders
@@ -202,12 +202,19 @@ export class AdQueryService {
             )
           : 100,
         positiveRate: parseFloat(agent.rating?.toString() ?? '100'),
-        price: `${ad.unitPrice.toFixed(2)} ${ad.fiatCurrency}`,
-        available: `${ad.availableAmount.toFixed(2)} USDT`,
-        limit: `${ad.minLimitFiat.toLocaleString()} - ${ad.maxLimitFiat.toLocaleString()} ${
-          ad.fiatCurrency
-        }`,
-        paymentMethod,
+        price: adPrice.toNumber(),
+        minLimitFiat: ad.minLimitFiat.toNumber(),
+        maxLimitFiat: ad.maxLimitFiat.toNumber(),
+        fromCurrency: ad.fromCurrency,
+        toCurrency: ad.toCurrency,
+        adType: ad.adType,
+        paymentMethods: ad.acceptedPaymentMethods.map((pm) => ({
+          id: pm.paymentMethod.id,
+          provider: pm.paymentMethod.supportedPaymentMethod.provider,
+          displayName: pm.paymentMethod.supportedPaymentMethod.displayName,
+          details: pm.paymentMethod.details,
+          currency: pm.paymentMethod.supportedPaymentMethod.currency,
+        })),
         deviationPercent,
         online: true,
       };

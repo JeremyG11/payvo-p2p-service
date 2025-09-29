@@ -4,8 +4,8 @@ import { logger } from '@/lib/logger';
 import { PricingConfigService } from '@/services/cache/rate/pricing';
 
 const STATIC_MARGIN_CONFIG = {
-  INBOUND: 0.01, // Fallback value for BUY
-  OUTBOUND: 0.01, // Fallback value for SELL
+  INBOUND: 0.01,
+  OUTBOUND: 0.01,
 };
 
 /**

@@ -2,15 +2,11 @@ import { z } from 'zod';
 import { OrderStatus } from '@prisma/client';
 
 export const CreateOrderSchema = z.object({
-  adId: z.uuid('Invalid ad ID').nonempty({
-    message: 'Ad ID is required',
-  }),
-  unitPrice: z
-    .number()
-    .min(0, { message: 'Unit price must be a positive number' }),
-  quantity: z.number().min(1, { message: 'Quantity must be at least 1' }),
+  adId: z.uuid({ message: 'Invalid ad ID' }),
+  paymentMethodId: z.uuid({ message: 'Invalid payment method ID' }),
   amount: z
     .string()
+    .transform((val) => val.replace(/,/g, ''))
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: 'Amount must be a positive number',
     }),

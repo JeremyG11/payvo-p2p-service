@@ -64,6 +64,8 @@ export const authenticate = async (
     req.userId = decoded.sub;
     res.locals.user = decoded;
 
+    console.log(`Authenticated userId: ${req.userId}`);
+
     let authData: CachedAuthData | null = null;
 
     try {

@@ -49,7 +49,6 @@ export class DecimalAwareCacheService {
    * @returns A promise that resolves when the item is cached.
    */
   public async set<T>(key: string, value: T, ttl: number): Promise<void> {
-    // Stringify the object, converting Decimal instances to strings.
     const stringifiedValue = JSON.stringify(value, (_, val) =>
       val instanceof Decimal ? val.toString() : val
     );

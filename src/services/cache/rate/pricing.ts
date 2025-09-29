@@ -1,6 +1,6 @@
+import Decimal from 'decimal.js';
 import { logger } from '@/lib/logger';
 import { PrismaClient, AdType } from '@prisma/client';
-import Decimal from 'decimal.js';
 
 export interface MarginConfig {
   margin: Decimal;

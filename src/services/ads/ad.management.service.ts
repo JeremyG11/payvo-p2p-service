@@ -1,16 +1,10 @@
-import {
-  PrismaClient,
-  AdStatus,
-  Prisma,
-  CryptoCurrency,
-  AdType,
-} from '@prisma/client';
+import { PrismaClient, AdStatus, Prisma, AdType } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { logger } from '@/lib/logger';
 import { TCreateAd, CreateAdSchema } from '@/schema/ads';
 import { RateService } from '@/services/rates/calculation';
+import { BadRequestError, NotFoundError } from '@/lib/error';
 import { generateAdId } from '@/services/rates/utils/id-generator';
-import { BadRequestError, NotFoundError, ValidationError } from '@/lib/error';
 
 /**
  * The AdManagementService handles all core business logic related to
@@ -90,14 +84,8 @@ export class AdManagementService {
       );
     }
 
-    const {
-      fiatCurrency,
-      paymentMethods,
-      minLimitFiat,
-      maxLimitFiat,
-      quantity: availableAmount,
-      ...rest
-    } = validatedAdPayload.data;
+    const { paymentMethods, minLimitFiat, maxLimitFiat, ...rest } =
+      validatedAdPayload.data;
 
     const advNo = await generateAdId();
 
@@ -110,7 +98,7 @@ export class AdManagementService {
         where: {
           agent: { userId },
           status: AdStatus.ACTIVE,
-          fiatCurrency,
+          fiatCurrency: rest.fromCurrency,
           adType,
         },
       }),
@@ -132,25 +120,6 @@ export class AdManagementService {
       userId
     );
 
-    // 4. Get the current market rate
-    let marketRate;
-    try {
-      marketRate = await this.rateService.getMarketRate({
-        fiatCurrency,
-        cryptoCurrency: CryptoCurrency.USDT,
-        adType,
-      });
-    } catch (error) {
-      logger.error('Failed to get market rate', {
-        error,
-        fiatCurrency,
-        adType,
-      });
-      throw new BadRequestError(
-        'Failed to get market rate. Please try again later.'
-      );
-    }
-
     // 5. Create the new ad
     const newAd = await this.prisma.ad.create({
       data: {
@@ -159,9 +128,10 @@ export class AdManagementService {
         terms: rest?.terms,
         minLimitFiat: new Decimal(minLimitFiat),
         maxLimitFiat: new Decimal(maxLimitFiat),
-        availableAmount: new Decimal(availableAmount),
-        unitPrice: marketRate.rate,
-        fiatCurrency,
+        unitPrice: new Decimal(rest.unitPrice),
+        fiatCurrency: rest.fromCurrency,
+        fromCurrency: rest.fromCurrency,
+        toCurrency: rest.toCurrency,
         adType,
         status: AdStatus.ACTIVE,
         acceptedPaymentMethods: {
@@ -205,9 +175,6 @@ export class AdManagementService {
           : undefined,
         maxLimitFiat: restOfData.maxLimitFiat
           ? new Decimal(restOfData.maxLimitFiat)
-          : undefined,
-        availableAmount: restOfData.quantity
-          ? new Decimal(restOfData.quantity)
           : undefined,
       };
 

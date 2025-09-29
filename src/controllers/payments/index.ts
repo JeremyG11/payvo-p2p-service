@@ -17,13 +17,13 @@ import {
 import { Router, Request, Response } from 'express';
 import {
   PaymentMethodHandler,
-  AuthenticatedRequest,
   ApiResponse,
   UserPaymentMethodDetails,
 } from '@/controllers/payments/base';
 import { MPesaKenyaHandler } from '@/controllers/payments/mpesa-kenya';
 import { CBEHandler } from '@/controllers/payments/cbe';
 import { TeleBirrHandler } from '@/controllers/payments/telebir';
+import { logger } from '@/lib/logger';
 
 /**
  * The main controller for handling all payment-related API requests.
@@ -45,12 +45,14 @@ export class PaymentController {
 
   /**
    * Extracts the userId from the request object.
-   * @param {AuthenticatedRequest} req The Express request object.
+   * @param {Request} req The Express request object.
    * @returns {string} The user's ID.
    * @throws {UnauthenticatedError} If the userId is not present.
    */
-  private getUserId(req: AuthenticatedRequest): string {
+  private getUserId(req: Request): string {
     const userId = req.userId;
+
+    console.log('Authenticated userId:', userId);
     if (!userId) {
       throw new UnauthenticatedError('Authentication required');
     }
@@ -123,6 +125,8 @@ export class PaymentController {
    */
   async addPaymentMethod(req: Request, res: Response): Promise<void> {
     try {
+      console.log('Request User ID:', req.userId);
+
       const userId = this.getUserId(req);
       const { methodName } = req.params;
       const handler = this.getHandler(methodName);
@@ -133,6 +137,7 @@ export class PaymentController {
         `${methodName} account added successfully`
       );
     } catch (error) {
+      logger.debug(error);
       throw new AppError('Failed to add payment method', 500, error);
     }
   }

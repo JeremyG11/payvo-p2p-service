@@ -9,6 +9,7 @@ import { CurrencyParamSchema, QueryParamsSchema } from '@/schema';
 import {
   AddCbePaymentMethodSchema,
   AddMPesaKenyaSchema,
+  AddPaymentMethodQueryParamsSchema,
   AddTeleBirrSchema,
 } from '@/schema/payment-methods';
 import {
@@ -483,6 +484,7 @@ export class PaymentController {
    */
   async addPaymentMethod(req: Request, res: Response): Promise<void> {
     try {
+      logger.debug('Adding payment method with request body:', req.params);
       const userId = this.getUserId(req);
       const { methodName } = req.params;
       const handler = this.getHandler(methodName);
@@ -493,6 +495,7 @@ export class PaymentController {
         `${methodName} account added successfully`
       );
     } catch (error) {
+      logger.debug(error);
       throw new AppError('Failed to add payment method', 500, error);
     }
   }
@@ -736,6 +739,9 @@ export class PaymentController {
 
     router.post(
       '/methods/:methodName',
+      validator(AddPaymentMethodQueryParamsSchema, 'params'),
+      authenticate,
+      authorize({ requiredPermissions: ['payment:methods:create'] }),
       asyncWrapper(this.addPaymentMethod.bind(this))
     );
     router.get(

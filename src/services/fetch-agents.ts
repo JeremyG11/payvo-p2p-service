@@ -1,6 +1,5 @@
 import { AppError } from '@/lib/error';
 import { config } from '@/config/env';
-import { getAuthContext } from '@/lib/utils/helpers';
 
 export const fetchAgents = async (
   token: string,
@@ -22,7 +21,6 @@ export const fetchAgents = async (
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    // Build URL with query parameters
     const urlWithParams = new URL(url);
     if (queryParams) {
       Object.entries(queryParams).forEach(([key, value]) => {
@@ -31,7 +29,6 @@ export const fetchAgents = async (
         }
       });
     }
-
     const resp = await fetch(urlWithParams.toString(), { headers });
     if (!resp.ok) {
       throw new AppError(`User Service returned ${resp.status}`, 503);
