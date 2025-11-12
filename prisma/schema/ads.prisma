@@ -1,0 +1,42 @@
+model AdsOnPaymentMethods {
+  adId                  String
+  paymentMethodId       String
+
+  ad                    Ad                     @relation(fields: [adId], references: [id])
+  paymentMethod         UserPaymentMethod   @relation(fields: [paymentMethodId], references: [id])
+
+  @@id([adId, paymentMethodId])
+}
+
+model Ad {
+  id                      String                @id @default(uuid())
+  advNo                   String                @unique
+  agentId                 String
+  title                   String?
+  terms                   String?
+  status                  AdStatus              @default(ACTIVE)
+  paymentTimeout          DateTime                  
+
+  adType                  AdType
+  fiatCurrency            FiatCurrency
+
+  fromCurrency            FiatCurrency
+  toCurrency              FiatCurrency
+
+  unitPrice               Decimal               @db.Decimal(36, 8)
+  minLimitFiat            Decimal               @db.Decimal(18, 2)
+  maxLimitFiat            Decimal               @db.Decimal(18, 2)
+  deviationPercent        Decimal?              @db.Decimal(10, 5)
+
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  agent                   Agent                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  orders                  Order[]
+  acceptedPaymentMethods  AdsOnPaymentMethods[]
+
+  @@index([agentId, status])
+  @@map("ads")
+}
+
+ 

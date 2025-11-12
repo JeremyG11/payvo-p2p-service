@@ -1,0 +1,33 @@
+secrets:
+  gh_token:
+    file: ${HOME}/.github_token
+
+services:
+  postgres-payvo-p2p-service-db:
+    image: postgres:15-alpine
+    container_name: payvo-p2p-service-db
+    ports:
+      - "5436:5432"
+    restart: always
+    environment:
+      POSTGRES_DB: payvo-p2p-service-db
+      POSTGRES_USER: payvo-p2p-user
+      POSTGRES_PASSWORD: payvo-p2p-password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payvo-p2p-user"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - p2p-network
+
+volumes:
+  postgres_data:
+
+networks:
+  p2p-network:
+    driver: bridge
+  payvo-network:
+    external: true

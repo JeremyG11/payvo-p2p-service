@@ -1,0 +1,43 @@
+model MPesaKenya {
+  id                 String             @id @default(uuid())
+  phoneNumber        String             @unique
+  accountName        String?
+  currency           FiatCurrency       @default(KES)
+  displayName        String?            @default("M-Pesa Kenya")
+  userPaymentMethod  UserPaymentMethod  @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@map("mpesa_kenya")
+}
+
+model Cbe {
+  id                 String           @id @default(uuid())
+  accountNumber      String           @unique
+  accountName        String
+  displayName        String?          @default("Commercial Bank of Ethiopia")
+  currency           FiatCurrency     @default(ETB)
+
+  userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
+  @@map("cbe")
+}
+
+model TeleBirr {
+  id                 String           @id @default(uuid())
+  phoneNumber        String           @unique
+  accountName        String?
+  currency           FiatCurrency     @default(ETB)
+  displayName        String?          @default("Tele Birr")
+
+  userPaymentMethod  UserPaymentMethod @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
+  @@map("telebirr")
+}

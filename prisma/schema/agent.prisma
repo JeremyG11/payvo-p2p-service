@@ -1,0 +1,35 @@
+
+model Agent {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  name               String   
+
+  totalOrders        Int      @default(0)
+  completedOrders    Int      @default(0)
+  commissionRate     Decimal  @db.Decimal(5, 2) @default(0.0)
+  rating             Decimal  @db.Decimal(3, 2) @default(0.0)
+
+  balances           Balance[]
+  ads                Ad[]
+  orders             Order[]
+  disputes           Dispute[] @relation("AgentDisputes")
+
+  @@index([userId])
+}
+
+model Balance {
+  id                String   @id @default(cuid())
+  userId            String   
+  currency          FiatCurrency  
+  available         Decimal   
+  locked            Decimal  
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  agent              Agent @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, currency])
+  @@map("balances")
+}

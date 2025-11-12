@@ -1,0 +1,111 @@
+model SupportedPaymentMethod {
+  id                    String                @id @default(uuid())
+  category              PaymentMethodCategory 
+  provider              String                @unique
+  displayName           String
+  currency              FiatCurrency
+  isActive              Boolean               @default(true)
+  logoUrl               String?
+
+  userPaymentMethods    UserPaymentMethod[]
+
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@unique([provider, currency])
+  @@index([provider])
+  @@index([category])
+}
+
+model UserPaymentMethod {
+  id                        String   @id @default(uuid())
+  userId                    String
+  supportedPaymentMethodId  String
+  isDefault                 Boolean  @default(false)
+  details                   Json     
+
+  mpesaKenya                MPesaKenya?
+  cbe                       Cbe?
+  telebirr                  TeleBirr?
+
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  ads                       AdsOnPaymentMethods[]
+
+  supportedPaymentMethod    SupportedPaymentMethod @relation(fields: [supportedPaymentMethodId], references: [id], onDelete: Restrict)
+  ordersAsPaymentMethod     Order[]      @relation("ordersAsPaymentMethod")
+
+  @@index([userId])
+}
+
+
+
+ 
+model Dispute {
+  id                  String     @id @default(uuid())
+  orderId             String     @unique
+  userId              String?
+  agentId             String?
+  
+  initiatedByUserId   String
+  
+  resolvedByAdminId   String?
+
+  reason              String
+  status              String     @default("OPEN")
+  resolution          String?
+  resolvedAt          DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  order               Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  agent               Agent?     @relation("AgentDisputes", fields: [agentId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+  @@index([initiatedByUserId])
+}
+
+ 
+ model PricingConfig {
+  id                    String   @id @default(uuid())
+  corridor              String   // e.g., "USD-ETB", "USD-SSP"
+  adType                AdType   
+  margin                Decimal  
+  minMargin             Decimal? 
+  maxMargin             Decimal? 
+  isActive              Boolean  @default(true)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([corridor, adType])
+  @@map("pricing_configs")
+}
+
+
+model BinanceP2PAd {
+  id                      String          @id @default(uuid())
+  advNo                   String          @unique 
+  tradeType               AdType           
+  asset                   CryptoCurrency  
+  fiatCurrency            FiatCurrency     
+  price                   Decimal         @db.Decimal(18, 8)  
+  minSingleTransAmount    Decimal         @db.Decimal(18, 2) 
+  maxSingleTransAmount    Decimal         @db.Decimal(18, 2)  
+  tradableQuantity        Decimal         @db.Decimal(36, 18)
+  
+  // Timestamps
+  fetchedAt               DateTime        @default(now())   
+  expiresAt               DateTime         
+  
+  // Indexes for efficient querying
+  @@index([advNo])
+  @@index([tradeType])
+  @@index([asset])
+  @@index([fetchedAt])
+  @@index([expiresAt])
+  
+  @@map("binance_ads")
+}

@@ -1,0 +1,91 @@
+
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  AGENT
+  USER
+}
+
+enum UserKycStatus {
+  PENDING      
+  INCOMPLETE
+  UNDER_REVIEW     
+  APPROVED
+  REJECTED
+  NEEDS_MORE_INFO  
+  EXPIRED     
+}
+
+enum Source {
+  BINANCE
+  OKX
+}
+
+enum FiatCurrency {
+  USD
+  KES
+  ETB
+  UGX
+  SSP
+}
+enum CryptoCurrency {
+  USDT
+}
+
+enum AdType {
+  BUY
+  SELL
+}
+
+enum UnitedStatesPaymentMethod {
+  BANK
+}
+enum KenyaPaymentMethod {
+  MPesaKenya
+}
+
+enum EthiopiaPaymentMethod {
+  CBE
+  TeleBirr
+}
+
+enum UgandaPaymentMethod {
+  MoMoNew
+}
+
+enum PaymentMethodCategory {
+  MOBILE_MONEY
+  BANK_TRANSFER
+  CASH 
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+
+ 
+ 
+
+enum OrderStatus {
+  PENDING_AGENT_CONFIRMATION
+  AGENT_ACCEPTED
+  AGENT_REJECTED
+  PROCESSING 
+  COMPLETED
+  CANCELLED
+  EXPIRED
+  DISPUTED
+}
+ 
+enum AdStatus {
+  ACTIVE
+  INACTIVE
+  PAUSED
+  EXPIRED
+  DELETED
+}
