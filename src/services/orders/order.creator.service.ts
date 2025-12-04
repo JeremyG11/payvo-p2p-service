@@ -5,7 +5,7 @@ import {
   OrderStatus,
   AdStatus,
   Prisma,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import { config } from '@/config/env';
 import type { TCreateOrderInput } from '@/schema/orders';
 import { publishOrderCreated } from '@/events/producers';

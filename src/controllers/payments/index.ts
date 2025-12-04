@@ -12,7 +12,7 @@ import {
   type MPesaKenya,
   type Cbe,
   type TeleBirr,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 
 import { Router, type Request, type Response } from 'express';
 import {

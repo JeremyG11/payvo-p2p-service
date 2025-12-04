@@ -3,7 +3,7 @@ import {
   CryptoCurrency,
   FiatCurrency,
   PaymentMethodCategory,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 
 interface PaymentMethodConfig {
   provider: string;

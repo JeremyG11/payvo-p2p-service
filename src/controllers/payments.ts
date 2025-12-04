@@ -22,7 +22,7 @@ import {
   type UserPaymentMethod,
   type SupportedPaymentMethod,
   PaymentMethodCategory,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';

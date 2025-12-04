@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/generated/prisma/client';
 import cron, { type ScheduledTask } from 'node-cron';
 import {
   BinanceP2PAdSynchronizer,

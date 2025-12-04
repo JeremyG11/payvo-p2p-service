@@ -1,6 +1,10 @@
 import Decimal from 'decimal.js';
 import { prisma } from '@/lib/prisma';
-import { AdType, FiatCurrency, CryptoCurrency } from '@prisma/client';
+import {
+  AdType,
+  FiatCurrency,
+  CryptoCurrency,
+} from '@/generated/prisma/client';
 import { PricingConfigService } from '@/services/cache/rate/pricing';
 import { logger } from '@/lib/logger';
 import { MarginApplier } from '@/services/rates/calculation/margin-applier';

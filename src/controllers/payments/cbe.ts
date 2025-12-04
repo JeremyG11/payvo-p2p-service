@@ -3,7 +3,7 @@ import {
   type Cbe,
   PaymentMethodCategory,
   FiatCurrency,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import type { Request } from 'express';
 import { BadRequestError } from '@/lib/error';
 import { AddCbePaymentMethodSchema } from '@/schema/payment-methods';

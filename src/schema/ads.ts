@@ -1,5 +1,5 @@
-import { z } from '@payvo/utils/zod';
-import { AdType, FiatCurrency } from '@prisma/client';
+import { z } from '@gatwech/utils/zod';
+import { AdType, FiatCurrency } from '@/generated/prisma/client';
 
 export const AdTypeSchema = z
   .enum(AdType)
@@ -43,13 +43,15 @@ export const CreateAdSchema = z
 
     title: z.string().optional(),
 
-    paymentTimeout: z.string()
-      .refine((dateStr) => {
+    paymentTimeout: z.string().refine(
+      (dateStr) => {
         const date = new Date(dateStr);
         return !isNaN(date.getTime()) && date > new Date();
-      }, {
+      },
+      {
         message: 'Payment timeout must be a valid future date',
-      }),
+      }
+    ),
     paymentMethods: z
       .string()
       .array()

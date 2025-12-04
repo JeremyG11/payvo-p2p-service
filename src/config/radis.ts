@@ -6,7 +6,7 @@ import {
   DistributedLockService,
   HashCacheService,
   RolePermissionCacheService,
-} from '@payvo/redis';
+} from '@gatwech/redis';
 
 // Cache services
 let cacheService: RolePermissionCacheService | null = null;

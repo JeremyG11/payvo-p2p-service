@@ -1,5 +1,4 @@
 import { Request } from 'express';
-import { User } from '@prisma/client';
 import type { JWTPayload } from 'jose';
 
 export interface InternalService {
@@ -25,9 +24,6 @@ declare global {
         type: 'static' | 'jwt';
         claims?: Record<string, any>;
       };
-    }
-    interface Response {
-      user?: User;
     }
   }
 }

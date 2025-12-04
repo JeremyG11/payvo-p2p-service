@@ -15,7 +15,7 @@ import {
   PrismaClient,
   UserKycStatus,
   UserRole,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import { getAuthContext } from '@/lib/utils/helpers';
 import type { ApiResponse } from '@/types';
 import { authenticate } from '@/middlewares/authenticate';

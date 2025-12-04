@@ -1,5 +1,5 @@
-import { FiatCurrency } from '@prisma/client';
-import { z } from '@payvo/utils/zod';
+import { FiatCurrency } from '@/generated/prisma/client';
+import { z } from '@gatwech/utils/zod';
 
 export const QueryParamsSchema = z.object({
   paymentMethodId: z

@@ -20,11 +20,16 @@ export const config = {
 
   // crypto
   jwtPublicKey: process.env.JWT_PUBLIC_KEY,
-  authSecret: process.env.BETTER_AUTH_SECRET,
+  authSecret: process.env.PAYVO_AUTH_SECRET,
   authIssuer: process.env.AUTH_ISSUER || 'payvo-auth-service',
 
   // kafka
   kafka: {
+    enabled:
+      process.env.KAFKA_ENABLED === 'true' ||
+      (process.env.NODE_ENV === 'production' &&
+        process.env.KAFKA_ENABLED !== 'false'),
+    namespace: process.env.KAFKA_NAMESPACE || 'prod',
     brokers: process.env.KAFKA_BROKERS
       ? process.env.KAFKA_BROKERS.split(',')
       : ['localhost:9092'],

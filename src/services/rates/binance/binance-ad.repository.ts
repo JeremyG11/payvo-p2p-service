@@ -3,7 +3,7 @@ import {
   CryptoCurrency,
   FiatCurrency,
   PrismaClient,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import Decimal from 'decimal.js';
 import { logger } from '@/lib/logger';
 import type { RawBinanceAdv } from './binance-api.client';

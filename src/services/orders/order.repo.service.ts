@@ -1,6 +1,11 @@
 import { NotFoundError, ConflictError } from '@/lib/error';
 import type { TUpdateOrderStatusInput } from '@/schema/orders';
-import { PrismaClient, type Order, OrderStatus, Prisma } from '@prisma/client';
+import {
+  PrismaClient,
+  type Order,
+  OrderStatus,
+  Prisma,
+} from '@/generated/prisma/client';
 
 /**
  * OrdersRepository handles all direct database interaction for the Order model.

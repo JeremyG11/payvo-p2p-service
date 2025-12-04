@@ -1,5 +1,5 @@
-import { z } from '@payvo/utils/zod';
-import { OrderStatus } from '@prisma/client';
+import { z } from '@gatwech/utils/zod';
+import { OrderStatus } from '@/generated/prisma/client';
 
 export const OrderIdParamSchema = z.object({
   orderId: z.uuid({ message: 'Invalid order ID' }),

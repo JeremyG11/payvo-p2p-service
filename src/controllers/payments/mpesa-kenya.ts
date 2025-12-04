@@ -3,7 +3,7 @@ import {
   PaymentMethodCategory,
   FiatCurrency,
   PrismaClient,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import type { Request } from 'express';
 import { BadRequestError } from '@/lib/error';
 import { AddMPesaKenyaSchema } from '@/schema/payment-methods';

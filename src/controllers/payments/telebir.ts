@@ -3,7 +3,7 @@ import {
   type TeleBirr,
   PaymentMethodCategory,
   FiatCurrency,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import type { Request } from 'express';
 import { BadRequestError } from '@/lib/error';
 import { AddTeleBirrSchema } from '@/schema/payment-methods';

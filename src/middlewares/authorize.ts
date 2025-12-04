@@ -27,7 +27,7 @@
  */
 import { logger } from '@/lib/logger';
 import type { Request, Response, NextFunction } from 'express';
-import { UserRole as PrismaUserRole } from '@prisma/client';
+import { UserRole as PrismaUserRole } from '@/generated/prisma/client';
 import { appCacheService } from '@/services/cache/app/app-cache';
 
 interface AuthorizeOptions {

@@ -4,7 +4,7 @@ import {
   RolePermissionCacheService,
   CachePublisherService,
   CacheSubscriberService,
-} from '@payvo/redis';
+} from '@gatwech/redis';
 
 export interface CachedRolePermission {
   id: string;

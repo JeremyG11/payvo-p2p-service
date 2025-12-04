@@ -1,5 +1,4 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -12,6 +11,6 @@
     "incremental": false
   },
 
-  "include": ["src/**/*", "./prisma.config.ts"],
+  "include": ["src/**/*", "__tests__/**/*", "./prisma.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,5 +1,5 @@
-import { AdType, PrismaClient } from '@prisma/client';
-import type { BinanceP2PAd } from '@prisma/client';
+import { AdType, PrismaClient } from '@/generated/prisma/client';
+import type { BinanceP2PAd } from '@/generated/prisma/client';
 import Decimal from 'decimal.js';
 import { logger } from '@/lib/logger';
 import { RateCalculator } from './rate-calculator';
@@ -68,7 +68,7 @@ export class AdRateFetcher {
       });
 
       /**
-       * Fallback to Database-based calculation 
+       * Fallback to Database-based calculation
        * If this also fails, propagate the error up with context.
        */
       try {
@@ -194,7 +194,6 @@ export class AdRateFetcher {
       rawRate: ad.price,
       volumeAvailable: ad.tradableQuantity || new Decimal(0),
       maxLimit: ad.maxSingleTransAmount,
-      
     }));
   }
 }

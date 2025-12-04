@@ -1,7 +1,7 @@
 import { logger } from '@/lib/logger';
-import { ZodError } from '@payvo/utils/zod';
+import { ZodError } from '@gatwech/utils/zod';
 import type { Request, Response, NextFunction } from 'express';
-import { AppError, NotFoundError, ValidationError } from '@payvo/utils';
+import { AppError, NotFoundError, ValidationError } from '@gatwech/utils';
 
 /**
  * Wraps async route handlers to automatically catch errors and forward to next().

@@ -1,12 +1,12 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import {
   BaseProducer,
-  type KafkaMessage,
+  type TKafkaMessage,
   type WithMetadata,
-} from '@payvo/kafka';
+} from '@gatwech/kafka';
 
-import { orderTopics } from '@payvo/kafka';
-import { producer } from '@/config/kafka';
+import { p2pTopics } from '@/infra/messaging/kafka/topics';
+import { producer } from '@/infra/messaging/kafka/client';
 
 /**
  * Represents the data structure for an order created event to be published to Kafka.
@@ -36,7 +36,7 @@ export interface TOrderCreatedData extends WithMetadata {
  * A singleton producer class for publishing order created events to Kafka.
  */
 export class OrderCreatedProducer extends BaseProducer<TOrderCreatedData> {
-  protected readonly topic = orderTopics.ORDER_CREATED.name;
+  protected readonly topic = p2pTopics.ORDER_CREATED.name;
   private static instance: OrderCreatedProducer;
   private constructor() {
     super(producer);
@@ -55,10 +55,9 @@ export class OrderCreatedProducer extends BaseProducer<TOrderCreatedData> {
    * Publishes a new order created event to the Kafka topic.
    */
   public async publishOrderCreated(
-    message: KafkaMessage<TOrderCreatedData>
+    message: TKafkaMessage<TOrderCreatedData>
   ): Promise<void> {
-    const enriched = this.enrichMessage(message);
-    await this.publish(enriched);
+    await this.publish(message);
   }
 }
 
@@ -66,7 +65,7 @@ export class OrderCreatedProducer extends BaseProducer<TOrderCreatedData> {
  * Utility function to publish an order created event.
  */
 export const publishOrderCreated = async (
-  data: KafkaMessage<TOrderCreatedData>
+  data: TKafkaMessage<TOrderCreatedData>
 ): Promise<void> => {
   return OrderCreatedProducer.getInstance().publishOrderCreated(data);
 };

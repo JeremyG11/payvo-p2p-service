@@ -1,4 +1,4 @@
-import { FiatCurrency, PaymentMethodCategory } from '@prisma/client';
+import { FiatCurrency, PaymentMethodCategory } from '@/generated/prisma/client';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { PAYMENT_METHODS_CONFIG } from '@/config';
@@ -21,7 +21,7 @@ export async function seedAllSupportedPaymentMethods(): Promise<void> {
     logger.info('Payment method seeding process completed successfully.');
   } catch (error) {
     logger.error('Failed to seed payment methods:', error);
-    throw error; 
+    throw error;
   }
 }
 

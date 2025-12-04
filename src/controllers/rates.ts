@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { FiatCurrency, PrismaClient, AdType } from '@prisma/client';
+import { FiatCurrency, PrismaClient, AdType } from '@/generated/prisma/client';
 import {
   BadRequestError,
   InternalServerError,

@@ -1,3 +1,6 @@
+import Decimal from 'decimal.js';
+import { AdType, CryptoCurrency, FiatCurrency } from '@/generated/prisma/enums';
+
 /**
  * Input parameters required for rate calculation.
  *

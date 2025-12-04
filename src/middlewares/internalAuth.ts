@@ -82,7 +82,7 @@ async function validateJwtToken(token: string): Promise<JWTPayload | null> {
     const key = await importSPKI(publicKeyPem, 'ES256');
     const { payload } = await jwtVerify(token, key, {
       issuer: config.authIssuer,
-      audience: 'payvo-services',
+      audience: 'internal-services',
     });
     return payload;
   } catch (err) {

@@ -1,4 +1,9 @@
-import { PrismaClient, AdStatus, Prisma, AdType } from '@prisma/client';
+import {
+  PrismaClient,
+  AdStatus,
+  Prisma,
+  AdType,
+} from '@/generated/prisma/client';
 import Decimal from 'decimal.js';
 import { logger } from '@/lib/logger';
 import { type TCreateAd, CreateAdSchema } from '@/schema/ads';

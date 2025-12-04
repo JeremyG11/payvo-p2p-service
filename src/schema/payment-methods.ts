@@ -1,4 +1,4 @@
-import { z } from '@payvo/utils/zod';
+import { z } from '@gatwech/utils/zod';
 
 export const AddMPesaKenyaSchema = z.object({
   phoneNumber: z.string(),

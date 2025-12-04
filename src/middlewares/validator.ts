@@ -1,6 +1,6 @@
-import { ValidationError } from '@payvo/utils';
-import { ZodError } from '@payvo/utils/zod';
-import type { ZodObject } from '@payvo/utils/zod';
+import { ValidationError } from '@gatwech/utils';
+import { ZodError } from '@gatwech/utils/zod';
+import type { ZodObject } from '@gatwech/utils/zod';
 import type { Request, Response, NextFunction } from 'express';
 
 /**

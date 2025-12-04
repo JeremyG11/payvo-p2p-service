@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { logger } from '@/lib/logger';
-import { PrismaClient, AdType } from '@prisma/client';
+import { PrismaClient, AdType } from '@/generated/prisma/client';
 
 export interface MarginConfig {
   margin: Decimal;
@@ -56,7 +56,9 @@ export class PricingConfigService {
 
       return {
         margin: config.margin,
+        // @ts-ignore: Ignore possible nulls for min/max margin
         minMargin: config.minMargin,
+        // @ts-ignore: Ignore possible nulls for min/max margin
         maxMargin: config.maxMargin,
       };
     } catch (error) {

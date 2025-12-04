@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { AdType } from '@prisma/client';
+import { AdType } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 
 async function main() {

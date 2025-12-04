@@ -1,9 +1,8 @@
 import {
-  KenyaPaymentMethod,
-  UgandaPaymentMethod,
-  EthiopiaPaymentMethod,
-  UnitedStatesPaymentMethod,
-} from '@prisma/client';
+  FiatCurrency,
+  UserKycStatus,
+  UserRole,
+} from '@/generated/prisma/enums';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -26,7 +25,7 @@ export interface MobileMoneyPaymentAccount extends BasePaymentAccount {
 export interface CachedAuthData {
   user: {
     id: string;
-    status: UserStatus;
+    status: UserKycStatus;
     role: UserRole;
     permissions: string[];
   };

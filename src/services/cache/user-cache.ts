@@ -1,6 +1,6 @@
 import { logger } from '@/lib/logger';
 import { config } from '@/config/env';
-import { HashCacheService } from '@payvo/redis';
+import { HashCacheService } from '@gatwech/redis';
 import { UserCacheFields, userCacheHashKey } from '@/lib/cache-keys';
 
 interface UserCacheServiceOptions {

@@ -3,12 +3,15 @@ import {
   CryptoCurrency,
   FiatCurrency,
   PrismaClient,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { PAIRS_TO_FETCH } from '@/config';
 import { BinanceAPIClient } from './binance-api.client';
-import { BinanceP2PAdRepository, type ProcessedAd } from './binance-ad.repository';
+import {
+  BinanceP2PAdRepository,
+  type ProcessedAd,
+} from './binance-ad.repository';
 
 /**
  * BinanceP2PAdSynchronizer orchestrates the process of fetching ads from the

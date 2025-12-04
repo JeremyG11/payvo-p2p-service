@@ -6,7 +6,7 @@ import {
   type Cbe,
   type TeleBirr,
   type UserPaymentMethod,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 
 /**
  * Interface for a standardized API response.

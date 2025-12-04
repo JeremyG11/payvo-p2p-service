@@ -1,4 +1,4 @@
-import { OrderStatus, UserRole } from '@prisma/client';
+import { OrderStatus, UserRole } from '@/generated/prisma/client';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 

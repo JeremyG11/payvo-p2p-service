@@ -1,5 +1,5 @@
 import { logger } from '@/lib/logger';
-import { AdStatus, PrismaClient } from '@prisma/client';
+import { AdStatus, PrismaClient } from '@/generated/prisma/client';
 
 /**
  * RateCleanupWorker is responsible for cleaning up expired internal P2P

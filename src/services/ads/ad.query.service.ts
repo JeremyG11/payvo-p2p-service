@@ -5,7 +5,7 @@ import {
   AdType,
   CryptoCurrency,
   FiatCurrency,
-} from '@prisma/client';
+} from '@/generated/prisma/client';
 import Decimal from 'decimal.js';
 import { logger } from '@/lib/logger';
 import { NotFoundError } from '@/lib/error';

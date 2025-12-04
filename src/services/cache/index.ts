@@ -2,7 +2,7 @@ export * from './user-cache';
 
 import { logger } from '@/lib/logger';
 import { config } from '@/config/env';
-import { createRedisClient, ServiceCacheService } from '@payvo/redis';
+import { createRedisClient, ServiceCacheService } from '@gatwech/redis';
 
 const SERVICE_REDIS_NAMESPACE = 'p2p_service';
 

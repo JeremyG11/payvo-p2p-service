@@ -2,7 +2,7 @@ import 'module-alias/register';
 import { logger } from '@/lib/logger';
 import { config } from '@/config/env';
 import type { CachedAuthData } from '@/types';
-import { UnauthenticatedError } from '@payvo/utils';
+import { UnauthenticatedError } from '@gatwech/utils';
 import type { Request, Response, NextFunction } from 'express';
 import { getAuthUserCachedOrCallAuth } from '@/services/user/user';
 

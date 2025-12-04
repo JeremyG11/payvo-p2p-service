@@ -1,8 +1,15 @@
 import { prisma } from '@/lib/prisma';
 import { OrdersRepository } from './order.repo.service';
 import { OrderCreator } from './order.creator.service';
-import type { TCreateOrderInput, TUpdateOrderStatusInput } from '@/schema/orders';
-import { PrismaClient, type Order, OrderStatus } from '@prisma/client';
+import type {
+  TCreateOrderInput,
+  TUpdateOrderStatusInput,
+} from '@/schema/orders';
+import {
+  PrismaClient,
+  type Order,
+  OrderStatus,
+} from '@/generated/prisma/client';
 
 /**
  * OrdersService acts as a public facade for all order-related operations.
